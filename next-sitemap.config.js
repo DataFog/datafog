@@ -69,4 +69,5 @@ module.exports = {
   },
   generateRobotsTxt: true,
   siteUrl,
+  // exclude: ["/page-*"], // example usage to skip any page that starts with "page-"
 };
