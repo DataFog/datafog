@@ -135,10 +135,12 @@ const SignUp = () => {
             size="sm"
             w="100%"
             leftIcon={<FcGoogle />}
+            bgColor="transparent"
             border="1px solid"
             borderColor="brand.400"
             color={primaryTextColor}
             _hover={{
+              bgColor: "transparent",
               borderColor: "brand.300",
             }}
             onClick={onGoogleSignUp}
