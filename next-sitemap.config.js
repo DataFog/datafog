@@ -1,8 +1,6 @@
 const glob = require("glob");
 
-const siteUrl = process.env.NEXT_PUBLIC_PROD_URL
-  ? process.env.NEXT_PUBLIC_PROD_URL
-  : `http://localhost:${process.env.PORT ?? 3000}`;
+const siteUrl = "http://example.com";
 
 /** @type {import('next-sitemap').IConfig} */
 module.exports = {
@@ -12,10 +10,18 @@ module.exports = {
         cwd: __dirname,
       });
 
+      const blogRoutes = await glob.sync("blogposts/*.mdx", {
+        cwd: __dirname,
+      });
+
       console.log("Routes:", routes); // Log the routes array for debugging
       console.log("Routes type:", typeof routes); // Log the type of routes variable
+      console.log("Blog Routes:", blogRoutes); // Log the routes array for debugging
+      console.log("Blog Routes type:", typeof blogRoutes); // Log the type of routes variable
 
-      if (!Array.isArray(routes)) {
+      const allRoutes = [...routes, ...blogRoutes];
+
+      if (!Array.isArray(allRoutes)) {
         throw new Error("Routes is not an array");
       }
 
@@ -30,13 +36,25 @@ module.exports = {
           .join("/")
       );
 
-      const locs = publicRoutesWithoutRouteGroups.map((route) => {
-        const path = route.replace(/^src\/app/, "").replace(/\/[^/]+$/, "");
-        const loc = path === "" ? siteUrl : `${siteUrl}/${path}`;
+      const locs = publicRoutesWithoutRouteGroups
+        .filter((route) => {
+          return !route.includes("/blog/[slug]");
+        })
+        .map((route) => {
+          const path = route.replace(/^src\/app/, "").replace(/\/[^/]+$/, "");
+          const loc = path === "" ? siteUrl : `${siteUrl}/${path}`;
+
+          return loc;
+        });
+
+      const blogLocs = blogRoutes.map((route) => {
+        const path = route.replace(/^blogposts/, "").replace(/\.mdx$/, "");
+        const loc = `${siteUrl}/blog/${path}`;
+
         return loc;
       });
 
-      const paths = locs.map((loc) => ({
+      const paths = [...locs, ...blogLocs].map((loc) => ({
         changefreq: "daily",
         lastmod: new Date().toISOString(),
         loc,
@@ -51,4 +69,5 @@ module.exports = {
   },
   generateRobotsTxt: true,
   siteUrl,
+  // exclude: ["/page-*"], // example usage to skip any page that starts with "page-"
 };
