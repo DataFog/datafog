@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { HttpStatusCode } from "axios";
-// @ts-ignore
 import LemonSqueezy from "@lemonsqueezy/lemonsqueezy.js";
 import { prismaClient } from "@/prisma/db";
 import { authOptions } from "@/config/auth";
@@ -43,10 +42,10 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    if (userPlan) {
-      const ls = new LemonSqueezy(process.env.LEMONSQUEEZY_API_KEY);
+    if (userPlan && userPlan?.lemonSubscriptionId) {
+      const ls = new LemonSqueezy(process.env.LEMONSQUEEZY_API_KEY || "");
       const response = await ls.getSubscription({
-        id: userPlan.lemonSubscriptionId,
+        id: parseInt(userPlan.lemonSubscriptionId || "", 10),
       });
       const customerPortalUrl = response.data.attributes.urls.customer_portal;
       return NextResponse.json(
