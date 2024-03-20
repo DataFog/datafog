@@ -1,4 +1,4 @@
-import { AuthOptions } from "next-auth";
+import { AuthOptions, Session, User } from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prismaClient } from "@/prisma/db";
 // import { createLoopsContact } from "@/libs/loops";
@@ -74,6 +74,14 @@ export const authOptions: AuthOptions = {
         },
       }), */
   ],
+  callbacks: {
+    session: async ({ session, user }: { session: Session; user: User }) => {
+      if (session?.user) {
+        session.user.id = user.id;
+      }
+      return Promise.resolve(session);
+    },
+  },
   events: {
     async signIn(event) {
       if (event.isNewUser && event.user.email) {
