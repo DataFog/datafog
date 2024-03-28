@@ -20,7 +20,7 @@ export async function POST(req: Request) {
         email,
         firstName: "",
         lastName: "",
-        tags: ["waitlits"],
+        tags: ["waitlist"],
       }); 
       */
       /* 
