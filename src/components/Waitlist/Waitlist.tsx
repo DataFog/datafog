@@ -48,7 +48,7 @@ export const Waitlist = () => {
             You caught us before we&apos;re ready.
           </Text>
           <Text>
-            We&apos;re working hard to put the finishing touches.
+            We&apos;re working hard on the finishing touches.
             <br />
             If you&apos;d like us to send you a reminder when we&apos;re ready,
             just put your email below.

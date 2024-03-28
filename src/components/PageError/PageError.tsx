@@ -19,7 +19,7 @@ export function PageError({ error, reset }: PageErrorProps) {
   return (
     <Center minH="100vh">
       <Stack alignItems="center" spacing="16px">
-        <Heading>Ops, an error occurred.</Heading>
+        <Heading>Oops, an error occurred.</Heading>
         <Button
           variant="solid"
           colorScheme="brand"
