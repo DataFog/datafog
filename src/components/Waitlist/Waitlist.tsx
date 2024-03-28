@@ -12,22 +12,32 @@ export const Waitlist = () => {
   const [isLoading, setLoading] = useState(false);
 
   const onAddToWaitlist = () => {
-    if (email) {
-      setLoading(true);
-      axios
-        .post("/api/waitlist", {
-          email,
+    // @ts-ignore
+    grecaptcha.ready(function () {
+      // @ts-ignore
+      grecaptcha
+        .execute(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY, {
+          action: "submit",
         })
-        .then(() => {
-          toast.success("You've been added to the waitlist!");
-        })
-        .catch(() => {
-          toast.error("Something went wrong. Please try again later.");
-        })
-        .finally(() => {
-          setLoading(false);
+        .then(function (token: string) {
+          if (email) {
+            setLoading(true);
+            axios
+              .post("/api/waitlist", {
+                email,
+              })
+              .then(() => {
+                toast.success("You've been added to the waitlist!");
+              })
+              .catch(() => {
+                toast.error("Something went wrong. Please try again later.");
+              })
+              .finally(() => {
+                setLoading(false);
+              });
+          }
         });
-    }
+    });
   };
   return (
     <Section flexDir="column" mb="160px" mt="80px">
@@ -80,6 +90,9 @@ export const Waitlist = () => {
               minW="180px"
               onClick={onAddToWaitlist}
               isLoading={isLoading}
+              className="g-recaptcha"
+              data-sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+              data-action="submit"
             >
               Remind me
             </Button>
