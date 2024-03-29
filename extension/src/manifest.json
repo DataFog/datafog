@@ -19,7 +19,7 @@
   "externally_connectable": {
     "matches": [
       "https://*.yourwebsite.com/*",
-      "https://2a8e-2001-b07-645f-cf50-d107-284b-a956-944f.ngrok-free.app/*"
+      "https://1aca-2001-b07-645f-cf50-5953-5adb-7e72-8d97.ngrok-free.app/*"
     ],
     "accepts_tls_channel_id": false
   },
@@ -55,7 +55,7 @@
   ],
   "host_permissions": [
     "*://*.yourwebsite.com/",
-    "https://2a8e-2001-b07-645f-cf50-d107-284b-a956-944f.ngrok-free.app/*"
+    "https://1aca-2001-b07-645f-cf50-5953-5adb-7e72-8d97.ngrok-free.app/*"
   ],
   "commands": {
     "open-popup": {

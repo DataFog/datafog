@@ -1,29 +1,26 @@
 import {
-  Button,
   ChakraProvider,
   Flex,
-  InputGroup,
-  InputRightElement,
   List,
   ListIcon,
   ListItem,
-  Spinner,
   Text,
-  Textarea,
 } from "@chakra-ui/react";
-import React, { useState } from "react";
+import React from "react";
 import { TbCheck } from "react-icons/tb";
+import { domainDev, domainProd } from "../../../config";
 import { Brand } from "../../atoms/Brand/Brand";
 import { GrayBox } from "../../atoms/GrayBox/GrayBox";
 import { WidgetButton } from "../../atoms/WidgetButton/WidgetButton";
+import { useBaseUrl } from "../../hooks/useBaseUrl";
 import { theme } from "../../theme";
-import { baseUrl } from "../../../config";
 
 export type PopupProps = {
   userName: string | undefined;
 };
 
 export const Popup: React.FC<PopupProps> = ({ userName }) => {
+  const baseUrl = useBaseUrl();
   return (
     <ChakraProvider theme={theme}>
       <GrayBox
