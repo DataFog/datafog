@@ -14,6 +14,7 @@
     "dist": "npm run rm:zip && npm run build && npm run rm:dist  && unzip zip/chrome-extension-*.zip -d dist/",
     "watch:dist": "npx nodemon --watch \"./src/**/*\" -e jsx,js,ts,tsx -x \"npm run dist\"",
     "start": "node utils/webserver.js",
+    "start:ngrok:dev": "ngrok http http://localhost:3000",
     "prettier": "prettier --write '**/*.{js,jsx,ts,tsx,json,css,scss,md}'",
     "cp:common-libs": "rm -rf ./src/common-libs/ && mkdir ./src/common-libs/ && cp -R ../common-libs/src/device.ts ./src/common-libs/ && cp -R ../common-libs/src/constants.ts ./src/common-libs/",
     "storybook": "storybook dev -p 6006",

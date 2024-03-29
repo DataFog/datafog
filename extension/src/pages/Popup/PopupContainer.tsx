@@ -2,7 +2,7 @@ import axios from "axios";
 import React, { useEffect, useState } from "react";
 import "./Popup.css";
 import { Popup } from "../../components/molecules/Popup/Popup";
-import { baseUrl, domain, portName } from "../../config";
+import { domainDev, domainProd, portName } from "../../config";
 
 type User = {
   email: string;
@@ -17,24 +17,30 @@ const PopupContainer = () => {
 
   const [theCookies, setCookies] = useState<chrome.cookies.Cookie[]>([]);
   const [hasAllCookies, setHasAllCookies] = useState(false);
+
   useEffect(() => {
     async function getCookies() {
-      const cookies = await chrome.cookies.getAll({ domain: domain });
-      setCookies(cookies);
+      chrome.management.getSelf(async (self) => {
+        const domain =
+          self.installType === "development" ? domainDev : domainProd;
 
-      const hasCsrfToken = !!cookies.find(
-        (cookie) =>
-          cookie.domain === domain &&
-          cookie.name === "__Host-next-auth.csrf-token"
-      );
+        const cookies = await chrome.cookies.getAll({ domain: domain });
+        setCookies(cookies);
 
-      const hasSessionToken = !!cookies.find(
-        (cookie) =>
-          cookie.domain === domain &&
-          cookie.name === "__Secure-next-auth.callback-url"
-      );
+        const hasCsrfToken = !!cookies.find(
+          (cookie) =>
+            cookie.domain === domain &&
+            cookie.name === "__Host-next-auth.csrf-token"
+        );
 
-      setHasAllCookies(hasCsrfToken && hasSessionToken);
+        const hasSessionToken = !!cookies.find(
+          (cookie) =>
+            cookie.domain === domain &&
+            cookie.name === "__Secure-next-auth.callback-url"
+        );
+
+        setHasAllCookies(hasCsrfToken && hasSessionToken);
+      });
     }
 
     getCookies();
@@ -47,22 +53,27 @@ const PopupContainer = () => {
         .join("; ");
 
       setLoadingUser(true);
-      axios
-        .get(`${baseUrl}/api/user`, {
-          headers: {
-            cookies: cookieString,
-          },
-        })
-        .then((res) => {
-          console.log(">>> res", res.data.user);
-          setUser(res?.data?.user);
-        })
-        .catch((err) => {
-          console.log(">>> err", err);
-        })
-        .finally(() => {
-          setLoadingUser(false);
-        });
+      chrome.management.getSelf(async (self) => {
+        const domain =
+          self.installType === "development" ? domainDev : domainProd;
+
+        axios
+          .get(`https://${domain}/api/user`, {
+            headers: {
+              cookies: cookieString,
+            },
+          })
+          .then((res) => {
+            console.log(">>> res", res.data.user);
+            setUser(res?.data?.user);
+          })
+          .catch((err) => {
+            console.log(">>> err", err);
+          })
+          .finally(() => {
+            setLoadingUser(false);
+          });
+      });
     }
   }, [hasAllCookies]);
 

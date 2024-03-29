@@ -1,25 +1,38 @@
-import { baseUrl, domain, portName } from "../../config";
+import { domainDev, domainProd, portName } from "../../config";
 
 console.log("This is the background page.");
 console.log("Put the background scripts here.");
 
-const onInstall = (object: chrome.runtime.InstalledDetails) => {
-  // Add context menu if needed
-  chrome.contextMenus.create({
-    id: "my-app-context-menu",
-    title: "Action name",
-    contexts: ["selection"],
-  });
+let baseDomain = domainProd;
 
-  if (object.reason === chrome.runtime.OnInstalledReason.INSTALL) {
-    /*
-      It might be a good idea to open a specific web page on install,
-      to show the user how to use the extension.
-    */
-    chrome.tabs.create({ url: `${baseUrl}/extension/welcome` }, function (tab) {
-      console.log(`New tab launched with ${baseUrl}/welcome`);
+const onInstall = (object: chrome.runtime.InstalledDetails) => {
+  chrome.management.getSelf((self) => {
+    console.log(self.installType);
+
+    if (self.installType === "development") {
+      baseDomain = domainDev;
+    }
+
+    // Add context menu if needed
+    chrome.contextMenus.create({
+      id: "my-app-context-menu",
+      title: "Action name",
+      contexts: ["selection"],
     });
-  }
+
+    if (object.reason === chrome.runtime.OnInstalledReason.INSTALL) {
+      /*
+        It might be a good idea to open a specific web page on install,
+        to show the user how to use the extension.
+      */
+      chrome.tabs.create(
+        { url: `https://${baseDomain}/extension/welcome` },
+        function (tab) {
+          console.log(`New tab launched with https://${baseDomain}/welcome`);
+        }
+      );
+    }
+  });
 };
 
 chrome.runtime.onInstalled.addListener(onInstall);
@@ -57,7 +70,7 @@ const getUserStatus = ({ callback }: GetUserStatusArg) => {
     including the cookies for your domain.
     This way we can check if the user is logged in or not.
   */
-  chrome.cookies.getAll({ domain: domain }).then((cookies) => {
+  chrome.cookies.getAll({ domain: baseDomain }).then((cookies) => {
     const cookieString = cookies
       .map((cookie) => `${cookie.name}=${cookie.value}`)
       .join("; ");
@@ -69,7 +82,7 @@ const getUserStatus = ({ callback }: GetUserStatusArg) => {
       method: "GET",
     };
 
-    fetch(`${baseUrl}/api/user`, params)
+    fetch(`https://${baseDomain}/api/user`, params)
       .then((response) => response.json())
       .then((data) => {
         callback({
@@ -95,7 +108,7 @@ type TrackExtensionEvent = {
   With the cookies the server can check if there's an active session (authentication on).
 */
 const track = ({ event, icon, notify, tags = {} }: TrackExtensionEvent) => {
-  chrome.cookies.getAll({ domain: domain }).then((cookies) => {
+  chrome.cookies.getAll({ domain: baseDomain }).then((cookies) => {
     const cookieString = cookies
       .map((cookie) => `${cookie.name}=${cookie.value}`)
       .join("; ");
@@ -109,7 +122,7 @@ const track = ({ event, icon, notify, tags = {} }: TrackExtensionEvent) => {
       body: JSON.stringify({ event, icon, notify, tags }),
     };
 
-    fetch(`${baseUrl}/api/track`, params);
+    fetch(`https://${baseDomain}/api/track`, params);
   });
 };
 
