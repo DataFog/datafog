@@ -25,6 +25,7 @@ export const Waitlist = () => {
             axios
               .post("/api/waitlist", {
                 email,
+                captchaToken: token,
               })
               .then(() => {
                 toast.success("You've been added to the waitlist!");
