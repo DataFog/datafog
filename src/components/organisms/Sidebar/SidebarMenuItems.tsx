@@ -40,10 +40,6 @@ export const MenuItem: React.FC<MenuItemProps> = ({
 }) => {
   const menuItemColor = useColorModeValue("blackAlpha.900", "whiteAlpha.900");
   const menuItemBgColor = useColorModeValue("blackAlpha.100", "whiteAlpha.100");
-  const menuItemActiveBgColor = useColorModeValue(
-    "blackAlpha.50",
-    "whiteAlpha.50"
-  );
   const spinnerColor = useColorModeValue("blackAlpha.300", "whiteAlpha.300");
 
   const isActive = currentPage === route;
@@ -52,12 +48,13 @@ export const MenuItem: React.FC<MenuItemProps> = ({
     <chakra.div
       w="100%"
       _hover={{
-        bgColor: isActive ? menuItemActiveBgColor : menuItemBgColor,
+        bgColor: menuItemBgColor,
       }}
       transition="background-color 0.2s ease-in-out"
-      color={menuItemColor}
-      bgColor={isActive ? menuItemBgColor : "transparent"}
+      color={isActive ? "brand.600" : menuItemColor}
+      bgColor={"transparent"}
       cursor="pointer"
+      fontWeight={isActive ? "bold" : "normal"}
       borderTopWidth="0"
       borderRadius="8px"
       mb={["0", "0", "0", "4px"]}
@@ -94,6 +91,9 @@ export const MenuItem: React.FC<MenuItemProps> = ({
           animation:
             "pulse-ring 1.25s cubic-bezier(0.215, 0.61, 0.355, 1) infinite",
         },
+        div: {
+          fontWeight: isActive ? "semibold" : "normal",
+        },
       }}
       {...props}
     >
@@ -114,11 +114,12 @@ export const MenuItem: React.FC<MenuItemProps> = ({
             justifyContent="flex-start"
             m="0 16px"
             h="40px"
+            fontWeight={isActive ? "bold" : "normal"}
             position="relative"
             target={isExternal ? "_blank" : "_self"}
             sx={{
               svg: {
-                stroke: menuItemColor,
+                stroke: isActive ? "brand.600" : menuItemColor,
               },
             }}
             onClick={(e) => {
