@@ -66,14 +66,13 @@ export const useSupabaseAuth = ({
   const onSignUpWithEmailAndPassword = async (
     name: string,
     email: string,
-    password: string,
-    redirectUrl: string
+    password: string
   ) => {
     const { data, error } = await supabaseBrowserClient.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: redirectUrl,
+        emailRedirectTo: window.location.origin + "/supabase/auth/callback",
         data: { name },
       },
     });

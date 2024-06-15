@@ -58,12 +58,7 @@ const SignUpWithEmailPassword = () => {
   const [password, setPassword] = useState("");
   const onEmailSignUp = async () => {
     setSigningUpWithEmail(true);
-    await onSignUpWithEmailAndPassword(
-      "",
-      email,
-      password,
-      websiteUrl + "/login"
-    );
+    await onSignUpWithEmailAndPassword("", email, password);
   };
 
   return (
