@@ -1,28 +1,28 @@
 "use client";
 
-import React, { useState } from "react";
-import {
-  Text,
-  Box,
-  Container,
-  Center,
-  Button,
-  HStack,
-  Flex,
-  VStack,
-  Slider,
-  SliderTrack,
-  SliderFilledTrack,
-  SliderThumb,
-  ListItem,
-  UnorderedList,
-  Heading,
-} from "@chakra-ui/react";
-import { TbCoin, TbPointer, TbShare } from "react-icons/tb";
-import { Header } from "@/components/Header/Header";
 import { Footer } from "@/components/Footer/Footer";
+import { Header } from "@/components/Header/Header";
 import { affiliateProgramLink, pricingPlans } from "@/config";
 import { useColorModeValues } from "@/hooks/useColorModeValues";
+import {
+  Box,
+  Button,
+  Center,
+  Container,
+  Flex,
+  HStack,
+  Heading,
+  ListItem,
+  Slider,
+  SliderFilledTrack,
+  SliderThumb,
+  SliderTrack,
+  Text,
+  UnorderedList,
+  VStack,
+} from "@chakra-ui/react";
+import { useState } from "react";
+import { TbCoin, TbPointer, TbShare } from "react-icons/tb";
 
 // format currency value in the US format
 const formatAmount = (value: number) => {
@@ -216,7 +216,7 @@ export function Affiliates() {
                   </SliderTrack>
                   <SliderThumb />
                 </Slider>
-                <Text>{growthValue} referrals</Text>
+                <Text>{proValue} referrals</Text>
               </Flex>
             </VStack>
 
