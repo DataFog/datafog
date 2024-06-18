@@ -6,6 +6,7 @@ import ArticleContent from "./ArticleContent";
 import { Header } from "@/components/Header/Header";
 import { CtaBox } from "@/components/CtaBox/CtaBox";
 import { ReadingProgress } from "../ReadingProgress/ReadingProgress";
+import { useColorModeValues } from "@/hooks/useColorModeValues";
 
 interface Props {
   readingTime: {
@@ -32,6 +33,8 @@ const Article = ({
   const topRef = useRef(null);
   const contentRef = useRef(null);
 
+  const { secondaryTextColor } = useColorModeValues();
+
   return (
     <>
       <ReadingProgress topRef={topRef} contentRef={contentRef} />
@@ -57,11 +60,16 @@ const Article = ({
                 {title}
               </Text>
 
-              <Text as="p" color="gray.600" mb="16px" fontSize="18px">
+              <Text as="p" color={secondaryTextColor} mb="16px" fontSize="18px">
                 {description}
               </Text>
 
-              <Flex flexDir="row" mb="16px" color="gray.500" fontSize="14px">
+              <Flex
+                flexDir="row"
+                mb="16px"
+                color={secondaryTextColor}
+                fontSize="14px"
+              >
                 <p>{readingTime.text}</p>
 
                 <Box mx="8px">•</Box>
