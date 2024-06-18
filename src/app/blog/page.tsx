@@ -19,7 +19,7 @@ function Blog() {
   ]);
 
   return (
-    <Box bgColor="gray.50" overflow="hidden" minH="100vh">
+    <Box overflow="hidden" minH="100vh">
       <Header />
       <Container maxW="container.lg" pb="64px">
         <Box my="64px">
