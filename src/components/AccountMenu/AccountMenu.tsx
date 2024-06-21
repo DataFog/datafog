@@ -21,6 +21,10 @@ type AccountMenuProps = {
   userPictureUrl: string;
 };
 
+/*
+  @docs
+  Set the .env var LEMONSQUEEZY_API_KEY
+*/
 export const AccountMenu = ({
   userName,
   userEmail,
