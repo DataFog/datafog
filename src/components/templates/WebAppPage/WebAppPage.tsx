@@ -1,6 +1,7 @@
 "use client";
 
 import { SideBar, sidebarWidth } from "@/components/organisms/Sidebar/Sidebar";
+import { Dashboard } from "@/components/pages/Dashboard/Dashboard";
 import { Routes } from "@/data/routes";
 import { useMobile } from "@/hooks/useMobile";
 import {
@@ -12,7 +13,6 @@ import {
   DrawerContent,
   DrawerOverlay,
   Flex,
-  Heading,
   IconButton,
   Spinner,
   Stack,
@@ -105,7 +105,7 @@ export const WebAppPage = ({ currentPage }: WebAppPageProps) => {
           >
             {currentPage === Routes.dashboard && (
               <Center w="100%" flexDir="column">
-                <Heading>Welcome</Heading>
+                <Dashboard />
               </Center>
             )}
             {/* Add the route components here */}
