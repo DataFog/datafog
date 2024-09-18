@@ -45,12 +45,12 @@ export function TrendChart({ data }: TrendChartProps) {
             <linearGradient id="fillMobile" x1="0" y1="0" x2="0" y2="1">
               <stop
                 offset="5%"
-                stopColor="var(--color-mobile)"
+                stopColor="var(--chakra-colors-brand-500)"
                 stopOpacity={0.8}
               />
               <stop
                 offset="95%"
-                stopColor="var(--color-mobile)"
+                stopColor="var(--chakra-colors-brand-500)"
                 stopOpacity={0.1}
               />
             </linearGradient>
@@ -88,7 +88,7 @@ export function TrendChart({ data }: TrendChartProps) {
             dataKey="total"
             type="natural"
             fill="url(#fillMobile)"
-            stroke="black"
+            stroke="var(--chakra-colors-brand-300)"
             stackId="a"
           />
           <ChartLegend content={<ChartLegendContent />} />

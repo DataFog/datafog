@@ -24,13 +24,13 @@ export function Overview({ data }: OverviewProps) {
         <BarChart data={data}>
           <XAxis
             dataKey="name"
-            stroke="#888888"
+            stroke="red"
             fontSize={12}
             tickLine={false}
             axisLine={false}
           />
           <YAxis
-            stroke="#888888"
+            stroke="red"
             fontSize={12}
             tickLine={false}
             axisLine={false}
@@ -38,9 +38,8 @@ export function Overview({ data }: OverviewProps) {
           />
           <Bar
             dataKey="total"
-            fill="currentColor"
+            fill="var(--chakra-colors-brand-500)"
             radius={[4, 4, 0, 0]}
-            className="fill-primary"
           />
           <ChartTooltip
             cursor={false}
