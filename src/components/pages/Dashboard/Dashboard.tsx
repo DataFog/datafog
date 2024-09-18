@@ -8,7 +8,6 @@ import { RecentSales } from "./components/recent-sales";
 import { Search } from "./components/search";
 import TeamSwitcher from "./components/team-switcher";
 import { UserNav } from "./components/user-nav";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -16,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Flex, Skeleton } from "@chakra-ui/react";
+import { Button, Flex, Skeleton } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { DashboardData } from "@/app/api/dashboard/route";
@@ -69,7 +68,7 @@ export const Dashboard = () => {
               <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
               <div className="flex items-center space-x-2">
                 <CalendarDateRangePicker />
-                <Button>Download</Button>
+                <Button colorScheme="brand">Download</Button>
               </div>
             </div>
 
@@ -232,7 +231,7 @@ export const Dashboard = () => {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
               <Card className="col-span-7">
                 <CardHeader>
-                  <CardTitle>Revenue</CardTitle>
+                  <CardTitle>Sales</CardTitle>
                 </CardHeader>
                 <CardContent className="pl-2">
                   <Skeleton isLoaded={!isLoading} borderRadius="8px">
