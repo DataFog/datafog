@@ -27,6 +27,14 @@ export const metadata: Metadata = {
   description: "Example dashboard app built using the components.",
 };
 
+/*
+  For more layout examples, check out:
+  https://ui.shadcn.com/examples/dashboard
+
+  For more charts examples, check out:
+  https://ui.shadcn.com/charts
+*/
+
 export const Dashboard = () => {
   const { data, isLoading } = useQuery({
     queryFn: () => {
