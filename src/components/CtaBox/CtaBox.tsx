@@ -46,7 +46,7 @@ export const CtaBox = () => {
         maxW="1000px"
         alignItems="center"
         textAlign="center"
-        bgGradient="linear(15deg, brand.100, brand.300)"
+        bgColor="brand.300"
         color="blackAlpha.900"
       >
         <Heading

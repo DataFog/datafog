@@ -18,6 +18,7 @@ import Image from "next/image";
 import { useColorModeValues } from "@/hooks/useColorModeValues";
 import { TbArrowNarrowLeft } from "react-icons/tb";
 import { useRouter } from "next/navigation";
+import { Logo } from "@/components/atoms/Logo/Logo";
 
 const Login = () => {
   const router = useRouter();
@@ -107,9 +108,7 @@ const Login = () => {
             mt="-60px"
             ml="0px"
           >
-            <Flex w="32px" h="32px" as="a" href="/">
-              <Image src="/logo.png" alt="logo" width={32} height={32} />
-            </Flex>
+            <Logo />
             <Text color={primaryTextColor} fontWeight="extrabold" ml="8px">
               {brandName}
             </Text>
