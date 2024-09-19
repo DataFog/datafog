@@ -16,6 +16,7 @@ import { brandName, discordLink, twitterLink, youTubeLink } from "@/config";
 import Image from "next/image";
 import { useColorModeValues } from "@/hooks/useColorModeValues";
 import { Routes } from "@/data/routes";
+import { Logo } from "../atoms/Logo/Logo";
 
 export const Footer = () => {
   const { secondaryTextColor, borderColor } = useColorModeValues();
@@ -42,9 +43,7 @@ export const Footer = () => {
         >
           <Stack alignItems="flex-start" mr="32px">
             <Stack direction="row" alignItems="center">
-              <Flex>
-                <Image src="/logo.png" alt="logo" width={32} height={32} />
-              </Flex>
+              <Logo />
               <Text fontWeight={700} fontSize="16px">
                 {brandName}
               </Text>

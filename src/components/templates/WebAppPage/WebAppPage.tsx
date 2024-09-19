@@ -2,6 +2,7 @@
 
 import { SideBar, sidebarWidth } from "@/components/organisms/Sidebar/Sidebar";
 import { Dashboard } from "@/components/pages/Dashboard/Dashboard";
+import Todo from "@/components/pages/Todo/Todo";
 import { Routes } from "@/data/routes";
 import { useMobile } from "@/hooks/useMobile";
 import {
@@ -106,6 +107,11 @@ export const WebAppPage = ({ currentPage }: WebAppPageProps) => {
             {currentPage === Routes.dashboard && (
               <Center w="100%" flexDir="column">
                 <Dashboard />
+              </Center>
+            )}
+            {currentPage === Routes.todo && (
+              <Center w="100%" flexDir="column">
+                <Todo />
               </Center>
             )}
             {/* Add the route components here */}

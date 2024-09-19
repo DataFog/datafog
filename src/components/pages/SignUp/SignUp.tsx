@@ -20,6 +20,7 @@ import Image from "next/image";
 import { useColorModeValues } from "@/hooks/useColorModeValues";
 import { TbArrowNarrowLeft } from "react-icons/tb";
 import { useRouter } from "next/navigation";
+import { Logo } from "@/components/atoms/Logo/Logo";
 
 const SignUp = () => {
   const router = useRouter();
@@ -112,9 +113,7 @@ const SignUp = () => {
             mb={["64px", null, null, "32px"]}
             mt="-60px"
           >
-            <Flex w="30px" h="30px" as="a" href="/">
-              <Image src="/logo.png" alt="logo" width={30} height={30} />
-            </Flex>
+            <Logo />
           </Flex>
           <Text
             color={primaryTextColor}

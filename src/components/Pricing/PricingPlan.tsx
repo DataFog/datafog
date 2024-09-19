@@ -51,7 +51,7 @@ export const PricingPlan = ({
   ctaText,
   ...props
 }: PricingPlanProps) => {
-  const { primaryTextColor, secondaryTextColor, borderColor } =
+  const { primaryTextColor, secondaryTextColor, borderColor, baseTextColor } =
     useColorModeValues();
 
   return (
@@ -85,7 +85,7 @@ export const PricingPlan = ({
               h="24px"
               lineHeight="24px"
               bgColor="brand.50"
-              color="brand.500"
+              color="brand.300"
               borderRadius="24px"
               fontSize="11px"
               fontWeight="semibold"
