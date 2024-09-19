@@ -7,6 +7,7 @@ import {
   Heading,
   VStack,
   Input,
+  Switch,
 } from "@chakra-ui/react";
 import {
   TbArrowBack,
@@ -14,9 +15,9 @@ import {
   TbArrowUp,
   TbCheck,
   TbChevronDown,
-  TbCirclePlus,
-  TbCircleX,
   TbDots,
+  TbPencil,
+  TbPlus,
   TbTrash,
 } from "react-icons/tb";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -65,6 +66,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 const TodoApp: React.FC = () => {
   const [inputText, setInputText] = useState("");
@@ -144,8 +154,10 @@ const TodoApp: React.FC = () => {
     }
   };
 
-  const handleUpdateTodo = (id: string, text: string) => {
-    updateTodoMutation.mutate({ id, text });
+  const handleUpdateTodo = async (
+    todo: Pick<Todo, "id" | "text" | "isCompleted">
+  ) => {
+    return await updateTodoMutation.mutateAsync(todo);
   };
 
   const todos = todosData?.todos || [];
@@ -170,7 +182,11 @@ const TodoApp: React.FC = () => {
           }
           onBlur={(e) => {
             if (info.row.original.text !== e.target.value) {
-              handleUpdateTodo(info.row.original.id, e.target.value);
+              handleUpdateTodo({
+                id: info.row.original.id,
+                text: e.target.value,
+                isCompleted: info.row.original.isCompleted,
+              });
             }
           }}
         />
@@ -243,6 +259,11 @@ const TodoApp: React.FC = () => {
                 </DropdownMenuItem>
               )}
 
+              <DropdownMenuItem onClick={() => openEditDialog(row.original)}>
+                <TbPencil className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+
               <DropdownMenuItem onClick={() => openDeleteDialog(row.original)}>
                 <TbTrash className="mr-2 h-4 w-4" />
                 Delete
@@ -297,6 +318,19 @@ const TodoApp: React.FC = () => {
     setIsDeleteDialogOpen(false);
   };
 
+  const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
+  const [todoToEdit, setTodoToEdit] = React.useState<Todo | null>(null);
+
+  const openEditDialog = (todo: Todo) => {
+    setTodoToEdit(todo);
+    setIsEditDialogOpen(true);
+  };
+
+  const closeEditDialog = () => {
+    setTodoToEdit(null);
+    setIsEditDialogOpen(false);
+  };
+
   if (isLoading) return <Text>Loading todos...</Text>;
   if (error) return <Text>An error occurred: {error.message}</Text>;
 
@@ -304,6 +338,9 @@ const TodoApp: React.FC = () => {
     <Container pt={["16px", "40px"]} alignItems="flex-start" minH="100vh">
       <VStack align="flex-start" spacing={4}>
         <Heading size="md">Todo List</Heading>
+        <Text className="text-slate-500 text-sm">
+          Example of CRUD operations (Create, Read, Update, Delete)
+        </Text>
         <Flex gap={2}>
           <Input
             value={inputText}
@@ -313,13 +350,13 @@ const TodoApp: React.FC = () => {
             borderRadius="md"
           />
           <Button
-            colorScheme="brand"
             onClick={handleAddTodo}
             isLoading={createTodoMutation.isPending}
             size="sm"
-            leftIcon={<TbCirclePlus />}
+            leftIcon={<TbPlus />}
             minW="80px"
             isDisabled={inputText.trim() === ""}
+            variant="solid"
           >
             Add
           </Button>
@@ -425,6 +462,15 @@ const TodoApp: React.FC = () => {
         isOpen={isDeleteDialogOpen}
         onClose={closeDeleteDialog}
       />
+      {isEditDialogOpen && (
+        <EditTodoDialog
+          todo={todoToEdit || undefined}
+          isOpen={isEditDialogOpen}
+          onClose={closeEditDialog}
+          onUpdate={handleUpdateTodo}
+          isLoading={updateTodoMutation.isPending}
+        />
+      )}
     </Container>
   );
 };
@@ -484,5 +530,77 @@ const DeleteTodoDialog = ({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  );
+};
+
+const EditTodoDialog = ({
+  isLoading,
+  isOpen,
+  onClose,
+  onUpdate,
+  todo,
+}: {
+  isLoading: boolean;
+  isOpen: boolean;
+  onClose: () => void;
+  onUpdate: (todo: Pick<Todo, "id" | "text" | "isCompleted">) => Promise<void>;
+  todo: Todo | undefined;
+}) => {
+  const [text, setText] = useState(todo?.text || "");
+  const [isCompleted, setIsCompleted] = useState(todo?.isCompleted || false);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Edit Todo</DialogTitle>
+          <DialogDescription>
+            Update your item, mark as complete.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="flex items-center gap-4">
+            <Label htmlFor="text" className="w-24 text-right">
+              Todo
+            </Label>
+            <div className="flex-1">
+              <Input
+                id="text"
+                defaultValue={todo?.text}
+                onChange={(e) => setText(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <Label htmlFor="is-completed" className="w-24 text-right">
+              Done
+            </Label>
+            <Switch
+              id="is-completed"
+              defaultChecked={todo?.isCompleted}
+              onChange={(e) => setIsCompleted(e.target.checked)}
+              colorScheme="brand"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            type="submit"
+            isLoading={isLoading}
+            colorScheme="brand"
+            onClick={async () => {
+              await onUpdate({
+                id: todo?.id || "",
+                text,
+                isCompleted: isCompleted,
+              });
+              onClose();
+            }}
+          >
+            Save changes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
