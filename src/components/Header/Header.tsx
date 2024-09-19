@@ -21,7 +21,8 @@ import { useGetStarted } from "@/hooks/useGetStarted";
 import { brandName } from "@/config";
 import { DarkModeSwitch } from "../DarkModeSwitch/DarkModeSwitch";
 import { useMobile } from "@/hooks/useMobile";
-import { TbMenu2 } from "react-icons/tb";
+import { TbMenu2, TbRocket } from "react-icons/tb";
+import { Logo } from "../atoms/Logo/Logo";
 
 type HeaderProps = {};
 
@@ -41,14 +42,8 @@ export const Header = ({}: HeaderProps) => {
     >
       <Flex maxW="1280px" w="100%">
         <Flex alignItems="center">
-          <Flex
-            w="32px"
-            h="32px"
-            mr="8px"
-            overflow="hidden"
-            bgColor="blackAlpha.200"
-          >
-            <Image src="/logo.png" alt="logo" width={32} height={32} />
+          <Flex w="32px" h="32px" mr="8px" overflow="hidden">
+            <Logo />
           </Flex>
           <Link
             w="auto"

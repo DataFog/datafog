@@ -2,16 +2,16 @@ import { extendTheme, theme } from "@chakra-ui/react";
 
 export const colors = {
   brand: {
-    50: theme.colors.teal["50"],
-    100: theme.colors.teal["100"],
-    200: theme.colors.teal["200"],
-    300: theme.colors.teal["300"],
-    400: theme.colors.teal["400"],
-    500: theme.colors.teal["500"],
-    600: theme.colors.teal["600"],
-    700: theme.colors.teal["700"],
-    800: theme.colors.teal["800"],
-    900: theme.colors.teal["900"],
+    50: theme.colors.gray["900"],
+    100: theme.colors.gray["900"],
+    200: theme.colors.gray["900"],
+    300: theme.colors.gray["300"],
+    400: theme.colors.gray["900"],
+    500: theme.colors.gray["900"],
+    600: theme.colors.gray["900"],
+    700: theme.colors.gray["900"],
+    800: theme.colors.gray["900"],
+    900: theme.colors.gray["900"],
   },
 };
 

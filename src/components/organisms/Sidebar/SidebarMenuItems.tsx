@@ -16,9 +16,12 @@ import {
   TbHeartHandshake,
   TbBrandHipchat,
   TbStar,
+  TbRocket,
+  TbChecklist,
 } from "react-icons/tb";
 import { Routes } from "../../../data/routes";
 import { brandName, cannyUrl } from "@/config";
+import { Logo } from "@/components/atoms/Logo/Logo";
 
 type MenuItemProps = {
   route?: Routes | string;
@@ -197,7 +200,7 @@ export const SidebarMenuItems: React.FC<MenuProps> = ({
             overflow="hidden"
             bgColor="blackAlpha.200"
           >
-            <Image src="/logo.png" alt="logo" width={32} height={32} />
+            <Logo />
           </Flex>
           <NextJsChakraLink
             w="100px"
@@ -216,6 +219,15 @@ export const SidebarMenuItems: React.FC<MenuProps> = ({
           loadingRoute={loadingRoute}
         >
           <TbUsers size="16px" /> &nbsp;<MenuLabel>Dashboard</MenuLabel>
+        </MenuItem>
+
+        <MenuItem
+          route={Routes.todo}
+          currentPage={currentPage}
+          onClick={onMenuItemClick}
+          loadingRoute={loadingRoute}
+        >
+          <TbChecklist size="16px" /> &nbsp;<MenuLabel>Todo</MenuLabel>
         </MenuItem>
 
         <Text

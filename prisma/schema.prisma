@@ -157,3 +157,11 @@ model WorkspacePendingInvitation {
   updatedAt   DateTime      @updatedAt
   workspace   Workspace     @relation(fields: [workspaceId], references: [id])
 }
+
+model Todo {
+  id          String   @id @default(cuid())
+  text        String
+  isCompleted Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

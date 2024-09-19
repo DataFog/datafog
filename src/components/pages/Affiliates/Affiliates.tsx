@@ -234,7 +234,7 @@ export function Affiliates() {
                 <Flex
                   p="8px"
                   borderRadius="14px"
-                  bgColor="brand.300"
+                  bgColor="brand.900"
                   sx={{
                     svg: { stroke: "white" },
                   }}
@@ -250,7 +250,7 @@ export function Affiliates() {
                 <Flex
                   p="8px"
                   borderRadius="14px"
-                  bgColor="brand.300"
+                  bgColor="brand.900"
                   sx={{
                     svg: { stroke: "white" },
                   }}
@@ -265,7 +265,7 @@ export function Affiliates() {
                 <Flex
                   p="8px"
                   borderRadius="14px"
-                  bgColor="brand.300"
+                  bgColor="brand.900"
                   sx={{
                     svg: { stroke: "white" },
                   }}

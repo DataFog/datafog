@@ -22,7 +22,7 @@ const highlightText = (
         key={index}
         as="span"
         bgColor={isHighlighted ? bgColor : ""}
-        color={isHighlighted ? "brand.400" : ""}
+        color={isHighlighted ? "brand.300" : ""}
         fontWeight={isHighlighted ? 600 : 400}
       >
         {chunk}.
