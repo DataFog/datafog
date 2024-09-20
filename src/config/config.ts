@@ -1,7 +1,13 @@
 export const brandName = "My App";
 export const landingPageTitle = "My App";
 export const landingPageDescription = "Make money today with My App";
-export const websiteUrl = "http://localhost:3000";
+
+/* 
+Only if you are using Supabase for authentication
+configure your website URL on Supabase https://docs.shipped.club/features/supabase#supabase-get-started
+*/
+export const websiteUrl = process.env.WEBSITE_URL || "";
+
 export const supportEmail = "support@email.com";
 export const openGraphImageUrl = "https://myapp.com/images/og-image.jpg";
 export const blogOpenGraphImageUrl = "https://myapp.com/images/og-image.jpg";

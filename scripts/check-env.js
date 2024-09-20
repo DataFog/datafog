@@ -4,6 +4,13 @@ console.warn(
   "\x1b[94m\x1b[1m==>> Shipped Environment variables check \x1b[0m\x1b[49m"
 );
 
+if (!process.env.WEBSITE_URL) {
+  console.warn("|| No \x1b[33mWEBSITE_URL\x1b[0m environment variable set");
+  console.warn("|| Configure it");
+  console.warn("|| Docs page: https://docs.shipped.club/features/database");
+  console.warn("=============================================");
+}
+
 if (!process.env.DATABASE_URL) {
   console.warn("|| No \x1b[33mDATABASE_URL\x1b[0m environment variable set");
   console.warn("|| Configure it to handle authentication");
@@ -13,7 +20,7 @@ if (!process.env.DATABASE_URL) {
 
 if (!process.env.NEXTAUTH_URL) {
   console.warn("|| No \x1b[33mNEXTAUTH_URL\x1b[0m environment variable set");
-  console.warn("|| Authentication will not work");
+  console.warn("|| NextAuth Authentication will not work");
   console.warn(
     "|| Docs page: https://docs.shipped.club/features/authentication#setup"
   );
@@ -24,7 +31,7 @@ if (!process.env.NEXTAUTH_URL) {
 
 if (!process.env.NEXTAUTH_SECRET) {
   console.warn("|| No \x1b[33mNEXTAUTH_SECRET\x1b[0m environment variable set");
-  console.warn("|| Authentication will not work");
+  console.warn("|| NextAuth Authentication will not work");
   console.warn(
     "|| Docs page: https://docs.shipped.club/features/authentication#setup"
   );
