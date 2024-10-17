@@ -55,7 +55,7 @@
   ],
   "host_permissions": [
     "*://*.yourwebsite.com/",
-    "https://*.ngrok-free.app/*"
+    "*://*.ngrok-free.app/*"
   ],
   "commands": {
     "open-popup": {
