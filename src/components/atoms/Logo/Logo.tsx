@@ -16,3 +16,19 @@ export const Logo = () => {
     </Flex>
   );
 };
+
+export const LogoSmall = () => {
+  return (
+    <Flex
+      w="18px"
+      h="18px"
+      bgColor="brand.500"
+      borderRadius="4px"
+      alignItems="center"
+      justifyContent="center"
+      color="white"
+    >
+      <TbRocket size="14px" />
+    </Flex>
+  );
+};

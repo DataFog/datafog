@@ -13,10 +13,10 @@ import { TbBrandDiscord, TbBrandX, TbBrandYoutube } from "react-icons/tb";
 import { Section } from "../atoms/Section/Section";
 import { Link } from "@chakra-ui/next-js";
 import { brandName, discordLink, twitterLink, youTubeLink } from "@/config";
-import Image from "next/image";
 import { useColorModeValues } from "@/hooks/useColorModeValues";
 import { Routes } from "@/data/routes";
 import { Logo } from "../atoms/Logo/Logo";
+import { BuiltWith } from "../BuiltWith/BuiltWith";
 
 export const Footer = () => {
   const { secondaryTextColor, borderColor } = useColorModeValues();
@@ -51,6 +51,8 @@ export const Footer = () => {
             <Text fontWeight={500} fontSize="14px">
               Start making money today.
             </Text>
+
+            <BuiltWith />
           </Stack>
           <Spacer />
           <Stack
