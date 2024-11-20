@@ -1,5 +1,5 @@
-import { Stack, Text } from "@chakra-ui/react";
-import { LogoSmall } from "../atoms/Logo/Logo";
+import { Flex, Stack, Text } from "@chakra-ui/react";
+import { TbRocket } from "react-icons/tb";
 
 export const BuiltWith = () => {
   return (
@@ -22,7 +22,17 @@ export const BuiltWith = () => {
     >
       <Text>Built with</Text>
       <Stack direction="row" spacing="4px" alignItems="center">
-        <LogoSmall />
+        <Flex
+          w="18px"
+          h="18px"
+          bgColor="brand.500"
+          borderRadius="4px"
+          alignItems="center"
+          justifyContent="center"
+          color="white"
+        >
+          <TbRocket size="14px" />
+        </Flex>
         <Text fontWeight="bold" color="brand.500">
           Shipped.club
         </Text>
