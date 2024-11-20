@@ -11,7 +11,8 @@ export const BuiltWith = () => {
       borderRadius="8px"
       alignItems="center"
       as="a"
-      href="/"
+      href="https://shipped.club"
+      target="_blank"
       fontSize="12px"
       transition="all .15s linear"
       _hover={{
