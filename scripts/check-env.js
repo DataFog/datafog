@@ -94,7 +94,26 @@ if (!process.env.LEMONSQUEEZY_WEBHOOK_SECRET) {
     "|| No \x1b[33mLEMONSQUEEZY_WEBHOOK_SECRET\x1b[0m environment variable set"
   );
   console.warn("|| Payments will not work");
-  console.warn("|| Docs page: https://docs.shipped.club/features/payments");
+  console.warn(
+    "|| Docs page: https://docs.shipped.club/features/payments/lemon-squeezy"
+  );
+  console.warn(
+    "==========================================================================="
+  );
+}
+
+if (
+  !process.env.STRIPE_SECRET_KEY ||
+  !process.env.STRIPE_PUBLIC_KEY ||
+  !process.env.STRIPE_WEBHOOK_SECRET
+) {
+  console.warn(
+    "|| No \x1b[33mSTRIPE_SECRET_KEY\x1b[0m, \x1b[33mSTRIPE_PUBLIC_KEY\x1b[0m or \x1b[33mSTRIPE_WEBHOOK_SECRET\x1b[0m environment variable set"
+  );
+  console.warn("|| Stripe payments will not work");
+  console.warn(
+    "|| Docs page: https://docs.shipped.club/features/payments/stripe"
+  );
   console.warn(
     "==========================================================================="
   );
