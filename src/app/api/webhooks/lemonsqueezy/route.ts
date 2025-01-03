@@ -51,14 +51,12 @@ export async function POST(request: Request) {
   });
 
   if (!subscriptionPlan) {
-    throw Error(`Lemon productId received ${lemonProductId} not found`);
+    throw Error(
+      `Lemon productId received ${lemonProductId} not found in database`
+    );
   }
 
   if (!subscription) {
-    if (!subscriptionPlan) {
-      throw Error("Subscription plan " + lemonProductId);
-    }
-
     await prismaClient.userPlan.create({
       data: {
         userId: user.id,
