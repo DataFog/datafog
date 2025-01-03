@@ -15,6 +15,20 @@ import { signOut } from "next-auth/react";
 import toast from "react-hot-toast";
 import { TbSelector, TbLogout, TbCreditCard } from "react-icons/tb";
 
+export const onLoadCustomerPortal = async () => {
+  try {
+    const response = await axios.get("/api/subscriptions");
+    if (response?.data?.customerPortalUrl) {
+      window.open(response.data.customerPortalUrl, "_blank");
+      return;
+    }
+
+    toast.error("You don't have an active subscription");
+  } catch (error) {
+    toast.error("You don't have an active subscription");
+  }
+};
+
 type AccountMenuProps = {
   userName: string;
   userEmail: string;
@@ -31,16 +45,6 @@ export const AccountMenu = ({
   userPictureUrl,
 }: AccountMenuProps) => {
   const { primaryTextColor, secondaryTextColor } = useColorModeValues();
-
-  const onLoadCustomerPortal = async () => {
-    const response = await axios.get("/api/subscriptions");
-    if (response?.data?.customerPortalUrl) {
-      window.open(response.data.customerPortalUrl, "_blank");
-      return;
-    }
-
-    toast.error("You don't have an active subscription");
-  };
 
   return (
     <Menu colorScheme="blackAlpha">

@@ -14,31 +14,16 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { TbCheck, TbCirclePlus, TbSelector } from "react-icons/tb";
 import { useSession } from "next-auth/react";
+import { useWorkspaces } from "@/hooks/useWorkspaces";
+import { CreateWorkspaceModal } from "@/components/organisms/CreateWorkspaceModal/CreateWorkspaceModal";
 
 type PopoverTriggerProps = React.ComponentPropsWithoutRef<
   typeof PopoverTrigger
@@ -58,13 +43,14 @@ type Group = {
 
 export default function TeamSwitcher({ className }: TeamSwitcherProps) {
   const { data: session, status } = useSession();
+  const { data: workspaces, isLoading: isLoadingWorkspaces } = useWorkspaces();
 
   const [open, setOpen] = useState(false);
   const [showNewTeamDialog, setShowNewTeamDialog] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   useEffect(() => {
-    if (status === "authenticated") {
+    if (!isLoadingWorkspaces && status === "authenticated") {
       const user = session?.user;
       if (user) {
         const groups = [
@@ -78,25 +64,21 @@ export default function TeamSwitcher({ className }: TeamSwitcherProps) {
             ],
           },
           {
-            label: "Teams",
-            teams: [
-              {
-                label: "Acme Inc.",
-                value: "acme-inc",
-              },
-              {
-                label: "Monsters Inc.",
-                value: "monsters",
-              },
-            ],
+            label: "Workspaces",
+            teams: workspaces?.map((workspace) => ({
+              label: workspace.name,
+              value: workspace.id,
+            })),
           },
         ];
 
-        setGroups(groups);
-        setSelectedTeam(groups[0].teams[0]);
+        setGroups(groups as Group[]);
+        if (groups[0]?.teams?.[0]) {
+          setSelectedTeam(groups[0].teams[0]);
+        }
       }
     }
-  }, [status]);
+  }, [status, isLoadingWorkspaces, workspaces?.length]);
 
   if (status === "loading") return null;
 
@@ -125,9 +107,9 @@ export default function TeamSwitcher({ className }: TeamSwitcherProps) {
         </PopoverTrigger>
         <PopoverContent className="w-[200px] p-0">
           <Command>
-            <CommandInput placeholder="Search team..." />
+            <CommandInput placeholder="Search workspace..." />
             <CommandList>
-              <CommandEmpty>No team found.</CommandEmpty>
+              <CommandEmpty>No workspace found.</CommandEmpty>
               {groups.map((group) => (
                 <CommandGroup key={group.label} heading={group.label}>
                   {group.teams.map((team) => (
@@ -172,7 +154,7 @@ export default function TeamSwitcher({ className }: TeamSwitcherProps) {
                     }}
                   >
                     <TbCirclePlus className="mr-2 h-5 w-5" />
-                    Create Team
+                    Create Workspace
                   </CommandItem>
                 </DialogTrigger>
               </CommandGroup>
@@ -180,50 +162,12 @@ export default function TeamSwitcher({ className }: TeamSwitcherProps) {
           </Command>
         </PopoverContent>
       </Popover>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Create team</DialogTitle>
-          <DialogDescription>
-            Add a new team to manage products and customers.
-          </DialogDescription>
-        </DialogHeader>
-        <div>
-          <div className="space-y-4 py-2 pb-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Team name</Label>
-              <Input id="name" placeholder="Acme Inc." />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="plan">Subscription plan</Label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a plan" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="free">
-                    <span className="font-medium">Free</span> -{" "}
-                    <span className="text-muted-foreground">
-                      Trial for two weeks
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="pro">
-                    <span className="font-medium">Pro</span> -{" "}
-                    <span className="text-muted-foreground">
-                      $9/month per user
-                    </span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setShowNewTeamDialog(false)}>
-            Cancel
-          </Button>
-          <Button type="submit">Continue</Button>
-        </DialogFooter>
-      </DialogContent>
+      {showNewTeamDialog && (
+        <CreateWorkspaceModal
+          isOpen={showNewTeamDialog}
+          onClose={() => setShowNewTeamDialog(false)}
+        />
+      )}
     </Dialog>
   );
 }
