@@ -1,5 +1,6 @@
 "use client";
 
+import { queryClient } from "@/app/providers";
 import { useColorModeValues } from "@/hooks/useColorModeValues";
 import {
   Button,
@@ -39,6 +40,8 @@ export const CreateWorkspaceModal = ({ isOpen, onClose }: Props) => {
       })
       .then(() => {
         onClose();
+        toast.success("Workspace created successfully");
+        queryClient.invalidateQueries({ queryKey: ["workspaces"] });
       })
       .catch((err) => {
         toast.error("Something went wrong. Please try again later.");
@@ -80,7 +83,7 @@ export const CreateWorkspaceModal = ({ isOpen, onClose }: Props) => {
               isDisabled={!workspaceName}
               isLoading={isCreating}
             >
-              Continue
+              Create
             </Button>
           </Stack>
         </ModalFooter>
