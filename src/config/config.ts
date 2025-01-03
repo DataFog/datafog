@@ -34,6 +34,9 @@ export const twitterMakerHandle = "@johndoe";
 
 export const cannyUrl = "https://yourstore.canny.io";
 
+type PaymentProvider = "lemon-squeezy" | "stripe";
+export const paymentProvider: PaymentProvider = "lemon-squeezy";
+
 /* 
   do not edit this
 */

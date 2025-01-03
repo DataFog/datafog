@@ -1,5 +1,6 @@
 "use client";
 
+import { paymentProvider } from "@/config";
 import { useColorModeValues } from "@/hooks/useColorModeValues";
 import {
   Menu,
@@ -15,12 +16,32 @@ import { signOut } from "next-auth/react";
 import toast from "react-hot-toast";
 import { TbSelector, TbLogout, TbCreditCard } from "react-icons/tb";
 
+const getLemonSqueezyCustomerPortalUrl = async () => {
+  const response = await axios.get("/api/subscriptions");
+  return response?.data?.customerPortalUrl;
+};
+
+const getStripeCustomerPortalUrl = async () => {
+  const response = await axios.get("/api/stripe/customer-portal");
+  return response?.data?.url;
+};
+
 export const onLoadCustomerPortal = async () => {
   try {
-    const response = await axios.get("/api/subscriptions");
-    if (response?.data?.customerPortalUrl) {
-      window.open(response.data.customerPortalUrl, "_blank");
-      return;
+    if (paymentProvider === "lemon-squeezy") {
+      const url = await getLemonSqueezyCustomerPortalUrl();
+      if (url) {
+        window.open(url, "_blank");
+        return;
+      }
+    }
+
+    if (paymentProvider === "stripe") {
+      const url = await getStripeCustomerPortalUrl();
+      if (url) {
+        window.open(url, "_blank");
+        return;
+      }
     }
 
     toast.error("You don't have an active subscription");
