@@ -15,6 +15,8 @@ import { getOpenGraph } from "@/components/OpenGraph/OpenGraph";
 import { getSEOTags } from "@/components/SEOTags/SEOTags";
 import { customTheme } from "@/theme";
 
+export const dynamic = 'force-static';
+
 export const metadata: Metadata = {
   ...getSEOTags({
     metadataBase: new URL(websiteUrl),

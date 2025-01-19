@@ -1,6 +1,6 @@
-export const brandName = "My App";
-export const landingPageTitle = "My App";
-export const landingPageDescription = "Make money today with My App";
+export const brandName = "datafog";
+export const landingPageTitle = "datafog";
+export const landingPageDescription = "Protect sensitive data in your forms with real-time scanning, inline alerts, and one-click redaction.";
 
 /* 
 Only if you are using Supabase for authentication
@@ -32,7 +32,7 @@ export const affiliateProgramLink =
 export const twitterHandle = "@myapp";
 export const twitterMakerHandle = "@johndoe";
 
-export const cannyUrl = "https://yourstore.canny.io";
+export const cannyUrl = "https://datafog.canny.io";
 
 type PaymentProvider = "lemon-squeezy" | "stripe";
 export const paymentProvider: PaymentProvider = "lemon-squeezy";

@@ -18,6 +18,7 @@ import {
   TbStar,
   TbRocket,
   TbChecklist,
+  TbScan,
 } from "react-icons/tb";
 import { Routes } from "../../../data/routes";
 import { brandName, cannyUrl } from "@/config";
@@ -212,25 +213,33 @@ export const SidebarMenuItems: React.FC<MenuProps> = ({
           </NextJsChakraLink>
         </Flex>
 
-        <MenuItem
+        {/* <MenuItem
           route={Routes.dashboard}
           currentPage={currentPage}
           onClick={onMenuItemClick}
           loadingRoute={loadingRoute}
         >
           <TbUsers size="16px" /> &nbsp;<MenuLabel>Dashboard</MenuLabel>
-        </MenuItem>
+        </MenuItem> */}
 
-        <MenuItem
+        {/* <MenuItem
           route={Routes.todo}
           currentPage={currentPage}
           onClick={onMenuItemClick}
           loadingRoute={loadingRoute}
         >
           <TbChecklist size="16px" /> &nbsp;<MenuLabel>Todo</MenuLabel>
+        </MenuItem> */}
+        <MenuItem
+          route={Routes.scan}
+          currentPage={currentPage}
+          onClick={onMenuItemClick}
+          loadingRoute={loadingRoute}
+        >
+          <TbScan size="16px" /> &nbsp;<MenuLabel>Scan</MenuLabel>
         </MenuItem>
 
-        <Text
+        {/* <Text
           fontSize="18px"
           fontWeight="semibold"
           letterSpacing="-0.45px"
@@ -260,7 +269,7 @@ export const SidebarMenuItems: React.FC<MenuProps> = ({
         >
           <TbHeartHandshake size="16px" /> &nbsp;
           <MenuLabel>Affiliate program</MenuLabel>
-        </MenuItem>
+        </MenuItem> */}
         <MenuItem
           route={cannyUrl}
           currentPage={currentPage}
@@ -270,7 +279,7 @@ export const SidebarMenuItems: React.FC<MenuProps> = ({
         >
           <TbBrandHipchat size="16px" /> &nbsp;
           <MenuLabel>Feedback</MenuLabel>
-        </MenuItem>
+        </MenuItem> 
         {/* uncomment if you are using the Canny Changelog widget */}
         {/* <MenuItem currentPage={currentPage} data-canny-changelog isExternal>
           <TbSpeakerphone size="16px" /> &nbsp;

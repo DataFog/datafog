@@ -1,5 +1,5 @@
 {
-  "name": "shipped",
+  "name": "datafog",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "1.0.9",
+    "@azure/ai-language-text": "^1.1.0",
     "@chakra-ui/next-js": "2.2.0",
     "@chakra-ui/react": "2.8.2",
     "@emotion/react": "11.11.1",
@@ -27,12 +28,13 @@
     "@radix-ui/react-avatar": "1.1.0",
     "@radix-ui/react-dialog": "1.1.1",
     "@radix-ui/react-dropdown-menu": "2.1.1",
-    "@radix-ui/react-label": "2.1.0",
+    "@radix-ui/react-label": "^2.1.0",
     "@radix-ui/react-popover": "1.1.1",
+    "@radix-ui/react-radio-group": "^1.2.2",
     "@radix-ui/react-select": "2.1.1",
     "@radix-ui/react-slot": "1.1.0",
-    "@radix-ui/react-switch": "1.1.0",
-    "@radix-ui/react-tabs": "1.1.0",
+    "@radix-ui/react-switch": "^1.1.0",
+    "@radix-ui/react-tabs": "^1.1.0",
     "@supabase/ssr": "0.0.10",
     "@supabase/supabase-js": "2.39.1",
     "@tanstack/react-query": "5.17.9",

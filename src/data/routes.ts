@@ -9,4 +9,5 @@ export enum Routes {
   signUp = "/signup",
   terms = "/terms",
   todo = "/todo",
+  scan = "/scan",
 }

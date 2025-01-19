@@ -3,6 +3,7 @@
 import { SideBar, sidebarWidth } from "@/components/organisms/Sidebar/Sidebar";
 import { Dashboard } from "@/components/pages/Dashboard/Dashboard";
 import Todo from "@/components/pages/Todo/Todo";
+import Scan from "@/components/pages/Scan/Scan";
 import { Routes } from "@/data/routes";
 import { useMobile } from "@/hooks/useMobile";
 import {
@@ -112,6 +113,11 @@ export const WebAppPage = ({ currentPage }: WebAppPageProps) => {
             {currentPage === Routes.todo && (
               <Center w="100%" flexDir="column">
                 <Todo />
+              </Center>
+            )}
+            {currentPage === Routes.scan && (
+              <Center w="100%" flexDir="column">
+                <Scan />
               </Center>
             )}
             {/* Add the route components here */}
