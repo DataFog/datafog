@@ -201,7 +201,7 @@ export const SidebarMenuItems: React.FC<MenuProps> = ({
             overflow="hidden"
             bgColor="blackAlpha.200"
           >
-            <Logo />
+            <Image src="/favicon-32x32.png" alt="Logo" width={32} height={32} />
           </Flex>
           <NextJsChakraLink
             w="100px"

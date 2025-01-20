@@ -13,7 +13,7 @@ export const useGetStarted = () => {
   const onGetStartedClick = () => {
     setLoading(true);
     if (user) {
-      router.push(Routes.dashboard);
+      router.push(Routes.scan);
       return;
     }
     router.push(Routes.signUp);

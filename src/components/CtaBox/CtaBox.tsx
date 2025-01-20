@@ -29,7 +29,7 @@ export const CtaBox = () => {
   const onGetStartedClick = () => {
     setLoadingCta(true);
     if (user) {
-      router.push(Routes.dashboard);
+      router.push(Routes.scan);
       return;
     }
     router.push(Routes.signUp);

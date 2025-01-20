@@ -1,5 +1,5 @@
-export const brandName = "datafog";
-export const landingPageTitle = "datafog";
+export const brandName = "DataFog";
+export const landingPageTitle = "DataFog";
 export const landingPageDescription = "Protect sensitive data in your forms with real-time scanning, inline alerts, and one-click redaction.";
 
 /* 
@@ -22,17 +22,17 @@ export const demoCalendlyLink = "https://calendly.com/myself/15min";
 export const emailFrom = "no-reply@email.com";
 
 // social links
-export const discordLink = "https://discordlink";
-export const twitterLink = "https://x.com/johndoe";
-export const youTubeLink = "https://youtube.com/johndoe";
+export const discordLink = "https://discord.com/invite/bzDth394R4";
+export const twitterLink = "https://x.com/_sidmohan";
+export const youTubeLink = "https://youtube.com/@DataFog";
 
 export const affiliateProgramLink =
   "https://yourstore.lemonsqueezy.com/affiliates";
 
-export const twitterHandle = "@myapp";
-export const twitterMakerHandle = "@johndoe";
+export const twitterHandle = "@datafoginc";
+export const twitterMakerHandle = "@_sidmohan";
 
-export const cannyUrl = "https://datafog.canny.io";
+export const cannyUrl = "https://datafog.canny.io/feedback";
 
 type PaymentProvider = "lemon-squeezy" | "stripe";
 export const paymentProvider: PaymentProvider = "lemon-squeezy";

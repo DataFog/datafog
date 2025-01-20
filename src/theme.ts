@@ -2,16 +2,16 @@ import { extendTheme, theme } from "@chakra-ui/react";
 
 export const colors = {
   brand: {
-    50: theme.colors.cyan["50"],
-    100: theme.colors.cyan["100"],
-    200: theme.colors.cyan["200"],
-    300: theme.colors.cyan["300"],
-    400: theme.colors.cyan["400"],
-    500: theme.colors.cyan["500"],
-    600: theme.colors.cyan["600"],
-    700: theme.colors.cyan["700"],
-    800: theme.colors.cyan["800"],
-    900: theme.colors.cyan["900"],
+    "50": "#E9F0FC",
+    "100": "#C1D4F6",
+    "200": "#99B8F0",
+    "300": "#719DEA",
+    "400": "#4981E4",
+    "500": "#2166DE",
+    "600": "#1B51B1",
+    "700": "#143D85",
+    "800": "#0D2959",
+    "900": "#07142C",
   },
 };
 

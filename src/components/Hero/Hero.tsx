@@ -38,7 +38,7 @@ export const Hero = ({
   const onGetStartedClick = () => {
     setLoadingCta(true);
     if (user) {
-      router.push(Routes.dashboard);
+      router.push(Routes.scan);
       return;
     }
     router.push(Routes.signUp);
@@ -82,10 +82,10 @@ export const Hero = ({
               backgroundClip="text"
               as="span"
             >
-              Make money
+              Remove PII
             </Text>
             <br />
-            while you sleep
+            So You Can Use AI
           </Heading>
           <Text
             textAlign={["center", "center", "center", "left"]}
@@ -95,7 +95,7 @@ export const Hero = ({
             fontSize={["14px", "15px", "18px", "20px"]}
             maxW={["70%", "70%", "70%", "560px"]}
           >
-            Launch faster and start making money today.
+              Don't miss out on the latest AI tools. Use DataFog to quickly remove PII from your files before you share them with AI.
           </Text>
 
           <Flex flexDir="column" alignItems="flex-start" px="16px" mt="24px">

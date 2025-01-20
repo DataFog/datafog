@@ -1,18 +1,14 @@
-import { Flex } from "@chakra-ui/react";
-import { TbRocket } from "react-icons/tb";
+import { Flex, Image } from "@chakra-ui/react";
 
 export const Logo = () => {
   return (
     <Flex
       w="32px"
       h="32px"
-      bgColor="brand.500"
-      borderRadius="8px"
       alignItems="center"
       justifyContent="center"
-      color="white"
     >
-      <TbRocket size="24px" />
+      <Image src="/favicon-32x32.png" alt="Logo" width={32} height={32} />
     </Flex>
   );
 };
@@ -20,15 +16,12 @@ export const Logo = () => {
 export const LogoSmall = () => {
   return (
     <Flex
-      w="18px"
+      w="18px" 
       h="18px"
-      bgColor="brand.500"
-      borderRadius="4px"
       alignItems="center"
       justifyContent="center"
-      color="white"
     >
-      <TbRocket size="14px" />
+      <Image src="/favicon-16x16.png" alt="Logo" width={16} height={16} />
     </Flex>
   );
 };

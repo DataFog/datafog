@@ -43,7 +43,7 @@ export const Header = ({}: HeaderProps) => {
       <Flex maxW="1280px" w="100%">
         <Flex alignItems="center">
           <Flex w="32px" h="32px" mr="8px" overflow="hidden">
-            <Logo />
+            <Image src="/favicon-32x32.png" alt="Logo" width={32} height={32} />
           </Flex>
           <Link
             w="auto"

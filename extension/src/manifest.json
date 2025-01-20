@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Extension name",
-  "description": "Extension description",
+  "name": "DataFog",
+  "description": "DataFog",
   "version": "0.0.0.1",
   "options_page": "options.html",
   "background": {
@@ -18,7 +18,7 @@
   },
   "externally_connectable": {
     "matches": [
-      "https://*.yourwebsite.com/*",
+      "https://*.datafog.vercel.app/*",
       "https://1aca-2001-b07-645f-cf50-5953-5adb-7e72-8d97.ngrok-free.app/*"
     ],
     "accepts_tls_channel_id": false
@@ -54,7 +54,7 @@
     "cookies"
   ],
   "host_permissions": [
-    "*://*.yourwebsite.com/",
+    "*://*.datafog.vercel.app/",
     "*://*.ngrok-free.app/*"
   ],
   "commands": {
