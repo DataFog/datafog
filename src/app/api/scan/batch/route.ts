@@ -62,7 +62,6 @@ export async function POST(request: Request) {
             return {
               id: doc.id,
               originalText: documents[Number(doc.id)], // Keep original text for highlighting
-              redactedText: doc.redactedText,
               entities: doc.entities
             } as ProcessedResult;
           }

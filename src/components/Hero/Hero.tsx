@@ -95,7 +95,7 @@ export const Hero = ({
             fontSize={["14px", "15px", "18px", "20px"]}
             maxW={["70%", "70%", "70%", "560px"]}
           >
-              Don't miss out on the latest AI tools. Use DataFog to quickly remove PII from your files before you share them with AI.
+              Don&apos;t miss out on the latest AI tools. Use DataFog to quickly remove PII from your files before you share them with AI.
           </Text>
 
           <Flex flexDir="column" alignItems="flex-start" px="16px" mt="24px">
