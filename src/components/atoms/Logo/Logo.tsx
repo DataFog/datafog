@@ -8,7 +8,7 @@ export const Logo = () => {
       alignItems="center"
       justifyContent="center"
     >
-      <Image src="/favicon-32x32.png" alt="Logo" width={32} height={32} />
+      <Image src="/apple-touch-icon.png" alt="Logo" width={32} height={32} />
     </Flex>
   );
 };
@@ -21,7 +21,7 @@ export const LogoSmall = () => {
       alignItems="center"
       justifyContent="center"
     >
-      <Image src="/favicon-16x16.png" alt="Logo" width={16} height={16} />
+      <Image src="/apple-touch-icon.png" alt="Logo" width={16} height={16} />
     </Flex>
   );
 };

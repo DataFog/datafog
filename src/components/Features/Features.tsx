@@ -3,18 +3,18 @@ import { Section } from "../atoms/Section/Section";
 
 const featuresList: Omit<FeatureProps, "showCta">[] = [
   {
-    category: "Productivity",
-    title: "Feature 1",
+    category: "Privacy",
+    title: "Enterprise-Grade Security",
     description:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed euismod, diam sit amet dictum ultrices, nunc magna ullamcorper elit, vitae tincidunt nisl nunc sit amet nunc. ",
-    imageUrl: "https://placehold.co/600x400",
+      "DataFog uses Azure's PII de-identification service - the same platform trusted by companies working in regulation-heavy industries like healthcare, finance, and legal sectors worldwide.",
+    imageUrl: "/feature-1.png",
   },
   {
-    category: "Leads generation",
-    title: "Feature 2",
+    category: "Ease of use",
+    title: "Built For AI",
     description:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed euismod, diam sit amet dictum ultrices, nunc magna ullamcorper elit, vitae tincidunt nisl nunc sit amet nunc. ",
-    imageUrl: "https://placehold.co/600x400",
+      "Copy-and-open a ChatGPT window with your redacted text copied in a single click. Support for other AI tools and browser extension coming soon for even faster workflow.",
+    imageUrl: "/feature-2.png",
   },
 ];
 

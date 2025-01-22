@@ -131,7 +131,7 @@ export const Hero = ({
                   </Button>
                 </Flex>
               )}
-              {showBookDemo && (
+              {/* {showBookDemo && (
                 <Flex
                   flexDir="row"
                   ml={["0px", "0px", "24px"]}
@@ -169,53 +169,9 @@ export const Hero = ({
                     </Button>
                   </Flex>
                 </Flex>
-              )}
+              )} */}
             </Flex>
-            {showUsers && (
-              <Stack
-                direction={["column", "column", "column", "row"]}
-                alignItems="center"
-                mt="48px"
-                spacing="16px"
-                alignSelf={["center", "center", "center", "flex-start"]}
-              >
-                <AvatarGroup size="md" max={6}>
-                  <Avatar
-                    name="Ryan Florence"
-                    src="https://bit.ly/ryan-florence"
-                  />
-                  <Avatar
-                    name="Segun Adebayo"
-                    src="https://bit.ly/sage-adebayo"
-                  />
-                  <Avatar name="Kent Dodds" src="https://bit.ly/kent-c-dodds" />
-                  <Avatar
-                    name="Prosper Otemuyiwa"
-                    src="https://bit.ly/prosper-baba"
-                  />
-                  <Avatar
-                    name="Christian Nwamba"
-                    src="https://bit.ly/code-beast"
-                  />
-                </AvatarGroup>
-                <Stack
-                  alignSelf={["center", "center", "center", "flex-start"]}
-                  alignItems={["center", "center", "center", "flex-start"]}
-                  spacing="4px"
-                >
-                  <Text fontWeight={600} color={primaryTextColor}>
-                    Trusted by 900+ users
-                  </Text>
-                  <HStack color="#FF9800" mt={["4px", "4px", "0"]}>
-                    <TbStarFilled />
-                    <TbStarFilled />
-                    <TbStarFilled />
-                    <TbStarFilled />
-                    <TbStarFilled />
-                  </HStack>
-                </Stack>
-              </Stack>
-            )}
+            
           </Flex>
         </Flex>
         <Flex
@@ -234,7 +190,7 @@ export const Hero = ({
             },
           }}
         >
-          <img src="https://placehold.co/400x400" alt="hero" />
+          <img src="/hero.gif" alt="hero" />
         </Flex>
         <Flex
           w={["180px", "240px", "300px", "300px", "300px"]}

@@ -26,8 +26,8 @@ export default function Home() {
         <Features />
         {/* <Testimonials /> */}
         <Pricing />
-        <FAQ />
-        <CtaBox />
+        {/* <FAQ /> */}
+        {/* <CtaBox /> */}
       </main>
       <Footer />
     </>

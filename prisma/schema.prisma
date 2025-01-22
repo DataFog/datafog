@@ -46,6 +46,7 @@ model User {
   email          String?          @unique
   emailVerified  DateTime?
   image          String?
+  scanCount      Int              @default(0)
   accounts       Account[]
   sessions       Session[]
   UserPlan       UserPlan?
@@ -77,6 +78,8 @@ enum PlanPropertyName {
   MAX_USERS
   MAX_PROJECTS
   MAX_TASKS
+  MAX_SCANS
+  MAX_FILE_SIZE
 }
 
 model PlanProperty {

@@ -1,3 +1,5 @@
+"use client";
+
 import { Flex, Text } from "@chakra-ui/react";
 import { TbPlayerPlayFilled } from "react-icons/tb";
 import { Section } from "../atoms/Section/Section";
@@ -13,7 +15,7 @@ export const ExplainerVideo = () => {
           fontWeight={600}
           px="48px"
         >
-          Watch how to make money in ~2 minutes
+          See how DataFog works in 20 seconds
         </Text>
 
         <Flex
@@ -44,11 +46,22 @@ export const ExplainerVideo = () => {
             _hover={{
               transform: "scale(1.1)",
             }}
+            onClick={() => {
+              const video = document.getElementById('explainer-video') as HTMLVideoElement;
+              if (video) {
+                video.play();
+              }
+            }}
           >
             <TbPlayerPlayFilled size="40px" />
           </Flex>
-          <img src={`https://placehold.co/800x600`} />
-          {/* <video src="" /> */}
+          <video 
+            id="explainer-video"
+            src="/datafog-demo.mp4"
+            poster={`/explainer-thumbnail.png`}
+            style={{ maxWidth: 'calc(70vw - 48px)' }}
+            controls={false}
+          />
         </Flex>
       </Flex>
     </Section>

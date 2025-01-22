@@ -6,7 +6,7 @@ export const landingPageDescription = "Protect sensitive data in your forms with
 Only if you are using Supabase for authentication
 configure your website URL on Supabase https://docs.shipped.club/features/supabase#supabase-get-started
 */
-export const websiteUrl = process.env.WEBSITE_URL || "";
+export const websiteUrl = process.env.WEBSITE_URL || "https://datafog.vercel.app";
 
 export const supportEmail = "support@email.com";
 export const openGraphImageUrl = "https://myapp.com/images/og-image.jpg";
@@ -16,7 +16,7 @@ export const blogOpenGraphImageUrl = "https://myapp.com/images/og-image.jpg";
 export const signInCallbackUrl = "/dashboard";
 
 // only needed if you have the "talk to us" button in the landing page
-export const demoCalendlyLink = "https://calendly.com/myself/15min";
+export const demoCalendlyLink = "https://calendly.com/datafog/15-min-zoom-call";
 
 // used by MailChimp, Loops, and MailPace
 export const emailFrom = "no-reply@email.com";
@@ -35,7 +35,7 @@ export const twitterMakerHandle = "@_sidmohan";
 export const cannyUrl = "https://datafog.canny.io/feedback";
 
 type PaymentProvider = "lemon-squeezy" | "stripe";
-export const paymentProvider: PaymentProvider = "lemon-squeezy";
+export const paymentProvider: PaymentProvider = "stripe";
 
 /* 
   do not edit this

@@ -20,6 +20,8 @@ import {
   ContextMenuContent,
   ContextMenuItem,
 } from "@/components/ui/context-menu"
+import { useSession } from "next-auth/react"
+import { cn } from "@/lib/utils"
 
 interface PiiEntity {
   text: string;
@@ -305,29 +307,60 @@ const CopyButton = ({
   );
 };
 
+const ResultsNav = ({ 
+  operation, 
+  setOperation
+}: { 
+  operation: OperationType,
+  setOperation: (op: OperationType) => void,
+}) => {
+  return (
+    <div className="flex items-center gap-2 p-2 bg-white border rounded-lg shadow-sm">
+      <Button
+        variant="ghost"
+        className={cn(
+          "flex-1",
+          operation === "PiiDetection" && "bg-gray-100"
+        )}
+        onClick={() => setOperation("PiiDetection")}
+      >
+        Highlight
+      </Button>
+      <Button
+        variant="ghost"
+        className={cn(
+          "flex-1",
+          operation === "PiiRedaction" && "bg-gray-100"
+        )}
+        onClick={() => setOperation("PiiRedaction")}
+      >
+        Redact
+      </Button>
+    </div>
+  )
+}
+
+// Add this mapping function near the top with other interfaces
+const mapOperationToApiTask = (operation: OperationType): string => {
+  return "PiiEntityRecognition"; // Always use PiiEntityRecognition for the API
+}
+
 export default function PrivacyScanner() {
+  const { data: session } = useSession()
   const [files, setFiles] = useState<File[]>([])
   const [text, setText] = useState('')
   const [result, setResult] = useState<BatchResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<string>('')
   const [operation, setOperation] = useState<OperationType>("PiiDetection")
-  const [showOriginals, setShowOriginals] = useState<boolean[]>([])
+  const [showOriginal, setShowOriginal] = useState(false)
   const [deniedEntities, setDeniedEntities] = useState<Map<number, Set<number>>>(new Map());
 
   useEffect(() => {
     if (result) {
-      setShowOriginals(new Array(result.results.length).fill(false))
+      setShowOriginal(false)
     }
   }, [result])
-
-  const toggleOriginal = (index: number) => {
-    setShowOriginals(prev => {
-      const next = [...prev]
-      next[index] = !next[index]
-      return next
-    })
-  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -346,7 +379,7 @@ export default function PrivacyScanner() {
         },
         body: JSON.stringify({ 
           documents: inputDocuments,
-          operation: "PiiEntityRecognition"  // Always use PiiEntityRecognition
+          operation: mapOperationToApiTask(operation)  // Map the operation type
         }),
       })
 
@@ -370,11 +403,11 @@ export default function PrivacyScanner() {
     const fileContents = await Promise.all(
       files.map(async (file) => await file.text())
     )
-    analyzeBatch(fileContents)
+    await analyzeBatch(fileContents)
   }
 
-  const handleTextSubmit = () => {
-    analyzeBatch([text])
+  const handleTextSubmit = async () => {
+    await analyzeBatch([text])
   }
 
   const handleDenyEntity = (docIndex: number, entityIndex: number) => {
@@ -401,7 +434,9 @@ export default function PrivacyScanner() {
         marginInline="0"
       >
         <div className="w-full">
-          <h2 className="text-2xl font-bold pt-5">Scan</h2>
+          <div className="flex justify-between items-center pt-5">
+            <h2 className="text-2xl font-bold">Scan</h2>
+          </div>
 
           <div className="space-y-4 mt-6">
             <div className="space-y-2">
@@ -492,14 +527,19 @@ export default function PrivacyScanner() {
                       <div className="flex items-center space-x-2">
                         <Switch
                           id={`show-original-${docIndex}`}
-                          checked={showOriginals[docIndex]}
-                          onCheckedChange={() => toggleOriginal(docIndex)}
+                          checked={showOriginal}
+                          onCheckedChange={setShowOriginal}
                         />
                         <Label htmlFor={`show-original-${docIndex}`} className="text-sm">
                           Show Original Text
                         </Label>
                       </div>
                     </div>
+                    
+                    <ResultsNav
+                      operation={operation}
+                      setOperation={setOperation}
+                    />
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
@@ -511,11 +551,11 @@ export default function PrivacyScanner() {
                             originalText={doc.originalText}
                             entities={doc.entities}
                             deniedEntities={deniedEntities.get(docIndex)}
-                            showOriginal={showOriginals[docIndex]}
+                            showOriginal={showOriginal}
                             isRedaction={operation === "PiiRedaction"}
                           />
                           <div className="pr-10">
-                            {showOriginals[docIndex] ? (
+                            {showOriginal ? (
                               <span>{doc.originalText}</span>
                             ) : operation === "PiiRedaction" ? (
                               <RedactedText 

@@ -31,7 +31,7 @@ export const Pricing = () => {
           fontWeight="extrabold"
           textAlign="center"
         >
-          Start making money today.
+          Unlock your data.
         </Heading>
         <Flex
           alignItems="center"
@@ -72,9 +72,9 @@ export const Pricing = () => {
             textDecor={isMonthly ? "line-through" : "none"}
             color="brand.400"
           >
-            save 2 months
+            7-day free trial
           </Text>
-          <Text ml="5px">with the annual plan</Text>
+          <Text ml="5px">for all plans</Text>
         </Flex>
       </Section>
       <Section mt="60px" alignItems="center">

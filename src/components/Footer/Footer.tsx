@@ -17,6 +17,7 @@ import { useColorModeValues } from "@/hooks/useColorModeValues";
 import { Routes } from "@/data/routes";
 import { Logo } from "../atoms/Logo/Logo";
 import { BuiltWith } from "../BuiltWith/BuiltWith";
+import Image from "next/image";
 
 export const Footer = () => {
   const { secondaryTextColor, borderColor } = useColorModeValues();
@@ -43,13 +44,13 @@ export const Footer = () => {
         >
           <Stack alignItems="flex-start" mr="32px">
             <Stack direction="row" alignItems="center">
-              <Logo />
+              <Image src="/apple-touch-icon.png" alt="Datafog Logo" width={50} height={50} />
               <Text fontWeight={700} fontSize="16px">
                 {brandName}
               </Text>
             </Stack>
             <Text fontWeight={500} fontSize="14px">
-              Start making money today.
+              Quick, secure PII redaction for AI tools.
             </Text>
 
             <BuiltWith />
@@ -61,7 +62,7 @@ export const Footer = () => {
             alignItems="flex-start"
             mt={["16px", "16px", "0"]}
           >
-            <VStack mr="8px" alignItems="flex-start">
+            {/* <VStack mr="8px" alignItems="flex-start">
               <Text fontWeight="bold" textTransform="uppercase">
                 Links
               </Text>
@@ -74,7 +75,7 @@ export const Footer = () => {
               <Link href={Routes.affiliates} isExternal alignItems="flex-start">
                 Affiliate — Earn 30%
               </Link>
-            </VStack>
+            </VStack> */}
 
             <VStack mr="8px" alignItems="flex-start">
               <Text fontWeight="bold" textTransform="uppercase">
