@@ -13,7 +13,7 @@ export const openGraphImageUrl = "https://myapp.com/images/og-image.jpg";
 export const blogOpenGraphImageUrl = "https://myapp.com/images/og-image.jpg";
 
 // the users will be redirected to this page after sign in
-export const signInCallbackUrl = "/dashboard";
+export const signInCallbackUrl = "/scan";
 
 // only needed if you have the "talk to us" button in the landing page
 export const demoCalendlyLink = "https://calendly.com/datafog/15-min-zoom-call";
