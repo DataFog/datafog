@@ -60,7 +60,7 @@ export const UserOnboarding = () => {
     setSubmitting(true);
     axios.post("/api/onboarding", onboardingData).finally(() => {
       setSubmitting(false);
-      router.push(Routes.dashboard);
+      router.push(Routes.scan);
     });
   };
 
@@ -70,7 +70,7 @@ export const UserOnboarding = () => {
   }
 
   if (isOnboardingCompleted) {
-    router.push(Routes.dashboard);
+    router.push(Routes.scan);
     return;
   }
 
