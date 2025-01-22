@@ -1,27 +1,24 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useIsLogged } from "./useIsLogged";
-import { useState } from "react";
 import { Routes } from "@/data/routes";
+import { useIsLogged } from "./useIsLogged";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export const useGetStarted = () => {
   const router = useRouter();
-
   const { user, isLogged } = useIsLogged();
-  const [isLoadingCta, setLoading] = useState(false);
+  const [isLoadingCta, setLoadingCta] = useState(false);
+
   const onGetStartedClick = () => {
-    setLoading(true);
+    setLoadingCta(true);
     if (user) {
       router.push(Routes.scan);
       return;
     }
-    router.push(Routes.signUp);
+    router.push('/#pricing');
+    setTimeout(() => setLoadingCta(false), 100);
   };
 
-  return {
-    isLogged,
-    isLoadingCta,
-    onGetStartedClick,
-  };
+  return { isLogged, isLoadingCta, onGetStartedClick };
 };

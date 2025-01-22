@@ -113,7 +113,8 @@ const SignUp = () => {
             mb={["64px", null, null, "32px"]}
             mt="-60px"
           >
-            <Logo />
+            <Image src="/apple-touch-icon.png" alt="Datafog Logo" width={50} height={50} />
+
           </Flex>
           <Text
             color={primaryTextColor}
@@ -124,7 +125,7 @@ const SignUp = () => {
             w="100%"
             mb={[0, null, null, "16px"]}
           >
-            Sign up to {brandName}
+            Create Your {brandName} Account
           </Text>
 
           <Button
@@ -148,62 +149,7 @@ const SignUp = () => {
             Continue with Google
           </Button>
 
-          <Stack
-            direction="row"
-            w="100%"
-            alignItems="center"
-            spacing="16px"
-            fontSize="12px"
-            color={baseTextColor[500]}
-          >
-            <Flex w="100%" h="1px" bgColor={baseTextColor[100]}></Flex>
-            <Flex>OR</Flex>
-            <Flex w="100%" h="1px" bgColor={baseTextColor[100]}></Flex>
-          </Stack>
-
-          <Text
-            mt="24px"
-            fontSize="13px"
-            fontWeight="semibold"
-            color={primaryTextColor}
-          >
-            Email
-          </Text>
-          <Input
-            size="sm"
-            borderRadius="4px"
-            borderColor={borderColor}
-            mt="4px"
-            onChange={(e) => setEmail(e.target.value)}
-            _focusWithin={{
-              boxShadow: "none",
-              borderColor: "brand.200",
-            }}
-            _placeholder={{
-              color: baseTextColor[500],
-            }}
-            placeholder="john@doe.com"
-          />
-
-          <Button
-            color="white"
-            size="sm"
-            h="36px"
-            bgColor="brand.400"
-            w="100%"
-            mt="24px"
-            onClick={() => onEmailSignUp()}
-            isLoading={isSigningUpWithEmail}
-            isDisabled={!isEmail.validate(email)}
-            _hover={{
-              bgColor: "brand.300",
-            }}
-            _active={{
-              bgColor: "brand.200",
-            }}
-          >
-            Create account
-          </Button>
+          
 
           <Text
             mt="16px"
@@ -226,15 +172,13 @@ const SignUp = () => {
         alignItems="center"
         justifyContent="center"
       >
-        <Flex p="32px" borderRadius="24px" mx="60px">
-          <Testimonial
-            text={testimonials[0].text}
-            name={testimonials[0].name}
-            highlightSentences={testimonials[0].highlightSentences}
-            job={testimonials[0].job}
-            pictureUrl={testimonials[0].pictureUrl}
-          />
-        </Flex>
+        <Image 
+          src="/signup-1.png" 
+          alt="Signup 1" 
+          width={1000}
+          height={1000}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        />
       </Flex>
     </Flex>
   );

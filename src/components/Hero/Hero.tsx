@@ -4,6 +4,7 @@ import { demoCalendlyLink } from "@/config";
 import { Routes } from "@/data/routes";
 import { useColorModeValues } from "@/hooks/useColorModeValues";
 import { useIsLogged } from "@/hooks/useIsLogged";
+import { useGetStarted } from "@/hooks/useGetStarted";
 import {
   Flex,
   Heading,
@@ -15,7 +16,6 @@ import {
   Avatar,
 } from "@chakra-ui/react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { TbArrowRight, TbCalendarDue, TbStarFilled } from "react-icons/tb";
 
 type HeroProps = {
@@ -31,18 +31,9 @@ export const Hero = ({
 }: HeroProps) => {
   const router = useRouter();
   const { user, isLogged } = useIsLogged();
+  const { isLoadingCta, onGetStartedClick } = useGetStarted();
 
   const { primaryTextColor, secondaryTextColor } = useColorModeValues();
-
-  const [isLoadingCta, setLoadingCta] = useState(false);
-  const onGetStartedClick = () => {
-    setLoadingCta(true);
-    if (user) {
-      router.push(Routes.scan);
-      return;
-    }
-    router.push(Routes.signUp);
-  };
 
   return (
     <Flex

@@ -51,36 +51,7 @@ export const Feature = ({
           {description}
         </Text>
 
-        {showCta && (
-          <Button
-            size="md"
-            variant="solid"
-            colorScheme="brand"
-            h="50px"
-            minH="50px"
-            w="220px"
-            px="24px"
-            borderRadius="16px"
-            my="16px"
-            onClick={() => onGetStartedClick()}
-            isLoading={isLoadingCta}
-            rightIcon={<TbArrowRight />}
-            sx={{
-              svg: {
-                transition: "all .15s linear",
-                transform: "translateX(0px)",
-              },
-            }}
-            _hover={{
-              bgColor: "brand.300",
-              svg: {
-                transform: "translateX(4px)",
-              },
-            }}
-          >
-            Try FREE now
-          </Button>
-        )}
+        
       </Flex>
       <Flex
         w={["calc(100vw - 24px)", "400px", "600px"]}

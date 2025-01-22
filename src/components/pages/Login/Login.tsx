@@ -108,7 +108,7 @@ const Login = () => {
             mt="-60px"
             ml="0px"
           >
-            <Logo />
+            <Image src="/apple-touch-icon.png" alt="Datafog Logo" width={50} height={50} />
             <Text color={primaryTextColor} fontWeight="extrabold" ml="8px">
               {brandName}
             </Text>
@@ -138,64 +138,9 @@ const Login = () => {
             Continue with Google
           </Button>
 
-          <Stack
-            direction="row"
-            w="100%"
-            alignItems="center"
-            spacing="16px"
-            fontSize="12px"
-            color={baseTextColor[500]}
-          >
-            <Flex w="100%" h="1px" bgColor={baseTextColor[100]}></Flex>
-            <Flex>OR</Flex>
-            <Flex w="100%" h="1px" bgColor={baseTextColor[100]}></Flex>
-          </Stack>
+          
 
-          <Text mt="24px" fontSize="13px" fontWeight="semibold">
-            Email
-          </Text>
-          <Input
-            mt="4px"
-            size="sm"
-            borderRadius="4px"
-            borderColor={borderColor}
-            onChange={(e) => setEmail(e.target.value)}
-            _focusWithin={{
-              boxShadow: "none",
-              borderColor: "brand.200",
-            }}
-            _placeholder={{
-              color: baseTextColor[500],
-            }}
-            placeholder="john@doe.com"
-          />
-
-          <Button
-            color="white"
-            size="sm"
-            h="36px"
-            bgColor="brand.400"
-            w="100%"
-            mt="24px"
-            onClick={() => onEmailSignIn()}
-            isLoading={isSigningInWithEmail}
-            isDisabled={!isEmail.validate(email)}
-            _hover={{
-              bgColor: "brand.300",
-            }}
-            _active={{
-              bgColor: "brand.200",
-            }}
-          >
-            Log in
-          </Button>
-
-          <Text mt="16px" fontSize="13px" color={baseTextColor[600]}>
-            Don&apos;t have an account?
-            <Link href="/signup" ml="4px" color="brand.500">
-              Sign up
-            </Link>
-          </Text>
+          
         </Flex>
       </Flex>
     </Flex>
