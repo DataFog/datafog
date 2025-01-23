@@ -34,7 +34,7 @@ const SignUp = () => {
     setSigningUpWithGoogle(true);
     signIn("google", {
       callbackUrl: window?.location
-        ? `${window.location.origin}/dashboard`
+        ? `${window.location.origin}/pricing`
         : "",
     });
   };
@@ -46,7 +46,7 @@ const SignUp = () => {
     await signIn("email", {
       email,
       callbackUrl: window?.location
-        ? `${window.location.origin}/dashboard`
+        ? `${window.location.origin}/pricing`
         : "",
     });
     setSigningUpWithEmail(false);

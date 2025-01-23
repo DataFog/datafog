@@ -16,7 +16,7 @@ export const useGetStarted = () => {
       router.push(Routes.scan);
       return;
     }
-    router.push('/#pricing');
+    router.push('/signup');
     setTimeout(() => setLoadingCta(false), 100);
   };
 

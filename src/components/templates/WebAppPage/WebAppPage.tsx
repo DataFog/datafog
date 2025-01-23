@@ -4,6 +4,7 @@ import { SideBar, sidebarWidth } from "@/components/organisms/Sidebar/Sidebar";
 import { Dashboard } from "@/components/pages/Dashboard/Dashboard";
 import Todo from "@/components/pages/Todo/Todo";
 import Scan from "@/components/pages/Scan/Scan";
+import { Pricing } from "@/components/Pricing/Pricing";
 import { Routes } from "@/data/routes";
 import { useMobile } from "@/hooks/useMobile";
 import {
@@ -26,10 +27,11 @@ import { useSession } from "next-auth/react";
 import { TbMenu2 } from "react-icons/tb";
 
 type WebAppPageProps = {
-  currentPage: Routes;
+  currentPage?: Routes;
+  children?: React.ReactNode;
 };
 
-export const WebAppPage = ({ currentPage }: WebAppPageProps) => {
+export const WebAppPage = ({ currentPage, children }: WebAppPageProps) => {
   const isMobile = useMobile();
   const { data: session, status } = useSession();
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -85,11 +87,11 @@ export const WebAppPage = ({ currentPage }: WebAppPageProps) => {
               />
 
               <DrawerBody>
-                <SideBar currentPage={currentPage} />
+                <SideBar currentPage={currentPage ?? Routes.dashboard} />
               </DrawerBody>
             </DrawerContent>
           </Drawer>
-          {!isMobile && <SideBar currentPage={currentPage} />}
+          {!isMobile && <SideBar currentPage={currentPage ?? Routes.dashboard} />}
           <Flex
             minW="100vw"
             w="100vw"
@@ -105,22 +107,34 @@ export const WebAppPage = ({ currentPage }: WebAppPageProps) => {
               marginInlineEnd: "0",
             }}
           >
-            {currentPage === Routes.dashboard && (
-              <Center w="100%" flexDir="column">
-                <Dashboard />
-              </Center>
+            {/* If children are provided, render them */}
+            {children}
+            
+            {/* Otherwise render based on route */}
+            {!children && (
+              <>
+                {currentPage === Routes.dashboard && (
+                  <Center w="100%" flexDir="column">
+                    <Dashboard />
+                  </Center>
+                )}
+                {currentPage === Routes.todo && (
+                  <Center w="100%" flexDir="column">
+                    <Todo />
+                  </Center>
+                )}
+                {currentPage === Routes.scan && (
+                  <Center w="100%" flexDir="column">
+                    <Scan />
+                  </Center>
+                )}
+                {currentPage === Routes.pricing && (
+                  <Center w="100%" flexDir="column">
+                    <Pricing />
+                  </Center>
+                )}
+              </>
             )}
-            {currentPage === Routes.todo && (
-              <Center w="100%" flexDir="column">
-                <Todo />
-              </Center>
-            )}
-            {currentPage === Routes.scan && (
-              <Center w="100%" flexDir="column">
-                <Scan />
-              </Center>
-            )}
-            {/* Add the route components here */}
           </Flex>
         </>
       )}

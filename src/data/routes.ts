@@ -10,4 +10,5 @@ export enum Routes {
   terms = "/terms",
   todo = "/todo",
   scan = "/scan",
+  pricing = "pricing"
 }

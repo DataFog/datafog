@@ -23,6 +23,7 @@ import { DarkModeSwitch } from "../DarkModeSwitch/DarkModeSwitch";
 import { useMobile } from "@/hooks/useMobile";
 import { TbMenu2, TbRocket } from "react-icons/tb";
 import { Logo } from "../atoms/Logo/Logo";
+import { useRouter } from "next/navigation";
 
 type HeaderProps = {};
 
@@ -30,7 +31,7 @@ export const Header = ({}: HeaderProps) => {
   const isMobile = useMobile();
   const { isLogged, isLoadingCta, onGetStartedClick } = useGetStarted();
   const [isMenuOpen, setMenuOpen] = useState(false);
-
+  const router = useRouter();
   return (
     <Flex
       w="100vw"
@@ -113,8 +114,7 @@ export const Header = ({}: HeaderProps) => {
                     size="sm"
                     variant="solid"
                     colorScheme="brand"
-                    onClick={() => onGetStartedClick()}
-                    isLoading={isLoadingCta}
+                    onClick={() => router.push('/signup')}
                     w="100%"
                     h="40px"
                   >
