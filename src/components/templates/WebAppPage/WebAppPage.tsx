@@ -44,10 +44,15 @@ export const WebAppPage = ({ currentPage, children }: WebAppPageProps) => {
       {status === "loading" && <Spinner color="brand.500" />}
       {status === "unauthenticated" && (
         <Stack>
-          <Text>Sign in to access</Text>
-          <Button as="a" href="/login" colorScheme="brand">
-            Sign in
-          </Button>
+          <Text>Sign in or sign up to access</Text>
+          <Stack direction="row" spacing={4}>
+            <Button as="a" href="/login" colorScheme="brand">
+              Sign in
+            </Button>
+            <Button as="a" href="/signup" colorScheme="brand" variant="outline">
+              Sign up
+            </Button>
+          </Stack>
         </Stack>
       )}
       {status === "authenticated" && (
