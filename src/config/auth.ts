@@ -9,6 +9,7 @@ import GoogleProvider from "next-auth/providers/google";
 // import FacebookProvider from "next-auth/providers/facebook";
 // import CredentialsProvider from "next-auth/providers/credentials"
 import EmailProvider from "next-auth/providers/email";
+import { addMailChimpListMember } from "@/libs/mailchimp";
 // more providers at https://next-auth.js.org/providers
 
 export const authOptions: AuthOptions = {
@@ -85,14 +86,14 @@ export const authOptions: AuthOptions = {
   events: {
     async signIn(event) {
       if (event.isNewUser && event.user.email) {
-        /*
+        console.log("Adding user to MailChimp list");
         await addMailChimpListMember({
           email: event.user.email,
           firstName: event.user.name || "",
           lastName: "",
           tags: ["new-user"],
         });
-        */
+        
         /*
         await createLoopsContact({
           email: event.user.email,
