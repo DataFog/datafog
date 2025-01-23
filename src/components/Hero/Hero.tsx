@@ -181,7 +181,7 @@ export const Hero = ({
             },
           }}
         >
-          <img src="/hero.gif" alt="hero" />
+          <img src="/hero2.png" alt="hero" />
         </Flex>
         <Flex
           w={["180px", "240px", "300px", "300px", "300px"]}
