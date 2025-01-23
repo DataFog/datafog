@@ -6,7 +6,7 @@ export const landingPageDescription = "Protect sensitive data in your forms with
 Only if you are using Supabase for authentication
 configure your website URL on Supabase https://docs.shipped.club/features/supabase#supabase-get-started
 */
-export const websiteUrl = process.env.WEBSITE_URL || "https://trydatafog.com";
+export const websiteUrl = process.env.WEBSITE_URL || "https://datafog.vercel.app";
 
 export const supportEmail = "support@email.com";
 export const openGraphImageUrl = "https://myapp.com/images/og-image.jpg";
