@@ -12,7 +12,7 @@ export const Pricing = () => {
   const router = useRouter();
   const { primaryTextColor, secondaryTextColor, borderColor } =
     useColorModeValues();
-  const [planType, setPlanType] = useState<"monthly" | "annual">("annual");
+  const [planType, setPlanType] = useState<"monthly" | "annual">("monthly");
   const isMonthly = planType === "monthly";
 
   const [loadingPlan, setLoadingPlan] = useState<number | null>(null);
@@ -69,7 +69,6 @@ export const Pricing = () => {
 
         <Flex mt="16px" fontSize="14px" color={secondaryTextColor}>
           <Text
-            textDecor={isMonthly ? "line-through" : "none"}
             color="brand.400"
           >
             7-day free trial
