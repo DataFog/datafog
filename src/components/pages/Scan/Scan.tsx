@@ -31,6 +31,14 @@ interface PiiEntity {
   confidenceScore: number;
 }
 
+interface UserEntity {
+  text: string;
+  category: string;
+  mode: "Manual";
+  offset: number;
+  length: number;
+}
+
 interface DocumentResult {
   id: string;
   originalText: string;
@@ -51,6 +59,74 @@ interface ScanOptions {
 }
 
 const OPENAI_CHAT_URL = "https://chat.openai.com/";
+
+const TextSelectionWrapper = ({ children, onTextSelect }: { 
+  children: React.ReactNode,
+  onTextSelect: (selectedText: string, offset: number) => void 
+}) => {
+  const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number, y: number } | null>(null);
+  const [selectedInfo, setSelectedInfo] = useState<{ text: string, offset: number } | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const selectedText = range.toString().trim();
+      if (selectedText) {
+        e.preventDefault();
+        
+        // Get the actual text node and calculate absolute offset
+        const container = e.currentTarget as HTMLElement;
+        const preSelectionRange = range.cloneRange();
+        preSelectionRange.selectNodeContents(container);
+        preSelectionRange.setEnd(range.startContainer, range.startOffset);
+        
+        const absoluteOffset = preSelectionRange.toString().length;
+        
+        setSelectedInfo({ text: selectedText, offset: absoluteOffset });
+        setContextMenuPosition({ x: e.clientX, y: e.clientY });
+        setMenuOpen(true);
+      }
+    }
+  };
+
+  const handleMarkAsPii = () => {
+    if (selectedInfo) {
+      onTextSelect(selectedInfo.text, selectedInfo.offset);
+      setMenuOpen(false);
+      setContextMenuPosition(null);
+      setSelectedInfo(null);
+      window.getSelection()?.removeAllRanges();
+    }
+  };
+
+  return (
+    <>
+      <div onContextMenu={handleContextMenu}>
+        {children}
+      </div>
+      {contextMenuPosition && (
+        <ContextMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <ContextMenuTrigger>
+            <div style={{ 
+              position: 'fixed', 
+              left: contextMenuPosition.x, 
+              top: contextMenuPosition.y,
+              width: '1px',
+              height: '1px' 
+            }} />
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem onClick={handleMarkAsPii}>
+              Mark as PII
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
+      )}
+    </>
+  );
+};
 
 const HighlightedText = ({ 
   text, 
@@ -353,8 +429,11 @@ export default function PrivacyScanner() {
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<string>('')
   const [operation, setOperation] = useState<OperationType>("PiiDetection")
+  const [userEntities, setUserEntities] = useState<Map<number, UserEntity[]>>(new Map());
   const [showOriginal, setShowOriginal] = useState(false)
   const [deniedEntities, setDeniedEntities] = useState<Map<number, Set<number>>>(new Map());
+  const [showDetectedEntities, setShowDetectedEntities] = useState(true);
+  const [showUserEntities, setShowUserEntities] = useState(false);
 
   useEffect(() => {
     if (result) {
@@ -397,6 +476,48 @@ export default function PrivacyScanner() {
       setLoading(false)
     }
   }
+
+  const handleManualEntity = (docIndex: number, text: string, offset: number) => {
+    // Check for overlapping entities
+    const end = offset + text.length;
+    const hasOverlap = (result?.results[docIndex]?.entities || []).some(entity => 
+      (offset >= entity.offset && offset < entity.offset + entity.length) ||
+      (end > entity.offset && end <= entity.offset + entity.length)
+    );
+
+    if (hasOverlap) {
+      alert('Cannot add overlapping entities');
+      return;
+    }
+
+    const newEntity: UserEntity = {
+      text,
+      category: "Manual PII",
+      mode: "Manual",
+      offset,
+      length: text.length
+    };
+
+    setUserEntities(prev => {
+      const next = new Map(prev);
+      const existing = next.get(docIndex) || [];
+      if (!existing.some(e => e.offset === offset)) {
+        next.set(docIndex, [...existing, newEntity]);
+      }
+      return next;
+    });
+
+    if (result) {
+      const newResult = { ...result };
+      const doc = newResult.results[docIndex];
+      doc.entities = [...doc.entities, { ...newEntity, confidenceScore: 1.0 }];
+      setResult(newResult);
+    }
+
+    if (!showUserEntities) {
+      setShowUserEntities(true);
+    }
+  };
 
   const handleFileSubmit = async () => {
     setStatus('Reading files...')
@@ -541,10 +662,15 @@ export default function PrivacyScanner() {
                       setOperation={setOperation}
                     />
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className={`grid gap-4 ${
+                      showDetectedEntities || showUserEntities 
+                        ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' 
+                        : 'grid-cols-1'}`
+                    }>
                       <div>
                         <h4 className="font-medium mb-2">
                           {operation === "PiiRedaction" ? "Redacted Text" : "Detected PII"}:
+                          <span className="ml-2 text-sm text-gray-500">(Double right-click to add manual {operation === "PiiRedaction" ? "redactions" : "highlights"})</span>
                         </h4>
                         <div className="relative p-4 bg-gray-50 rounded min-h-[200px] whitespace-pre-wrap">
                           <CopyButton 
@@ -554,47 +680,91 @@ export default function PrivacyScanner() {
                             showOriginal={showOriginal}
                             isRedaction={operation === "PiiRedaction"}
                           />
-                          <div className="pr-10">
-                            {showOriginal ? (
-                              <span>{doc.originalText}</span>
-                            ) : operation === "PiiRedaction" ? (
-                              <RedactedText 
-                                text={doc.originalText}
-                                entities={doc.entities}
-                                docIndex={docIndex}
-                                deniedEntities={deniedEntities.get(docIndex)}
-                                onDenyEntity={handleDenyEntity}
-                              />
-                            ) : (
-                              <HighlightedText 
-                                text={doc.originalText} 
-                                entities={doc.entities}
-                                docIndex={docIndex}
-                                deniedEntities={deniedEntities.get(docIndex)}
-                                onDenyEntity={handleDenyEntity}
-                              />
-                            )}
-                          </div>
+                          <TextSelectionWrapper onTextSelect={(text, offset) => handleManualEntity(docIndex, text, offset)}>
+                            <div className="pr-10">
+                              {showOriginal ? (
+                                <span>{doc.originalText}</span>
+                              ) : operation === "PiiRedaction" ? (
+                                <RedactedText 
+                                  text={doc.originalText}
+                                  entities={doc.entities}
+                                  docIndex={docIndex}
+                                  deniedEntities={deniedEntities.get(docIndex)}
+                                  onDenyEntity={handleDenyEntity}
+                                />
+                              ) : (
+                                <HighlightedText 
+                                  text={doc.originalText} 
+                                  entities={doc.entities}
+                                  docIndex={docIndex}
+                                  deniedEntities={deniedEntities.get(docIndex)}
+                                  onDenyEntity={handleDenyEntity}
+                                />
+                              )}
+                            </div>
+                          </TextSelectionWrapper>
                         </div>
                       </div>
                       
                       <div>
-                        <h4 className="font-medium mb-2">Detected Entities:</h4>
-                        <div className="space-y-2 p-4 bg-gray-50 rounded min-h-[200px] overflow-auto">
-                          {doc.entities.map((entity, index) => (
-                            <div key={index} className="p-2 bg-white rounded border">
-                              <div className="grid grid-cols-[auto,1fr] gap-x-2">
-                                <span className="font-medium">Text:</span>
-                                <span>{entity.text}</span>
-                                <span className="font-medium">Category:</span>
-                                <span>{entity.category}</span>
-                                <span className="font-medium">Confidence:</span>
-                                <span>{(entity.confidenceScore * 100).toFixed(2)}%</span>
-                              </div>
-                            </div>
-                          ))}
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-medium">Detected Entities:</h4>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => setShowDetectedEntities(!showDetectedEntities)}
+                          >
+                            {showDetectedEntities ? 'Collapse' : 'Expand'}
+                          </Button>
                         </div>
+                        {showDetectedEntities && (
+                          <div className="space-y-2 p-4 bg-gray-50 rounded min-h-[200px] overflow-auto">
+                            {doc.entities.map((entity, index) => (
+                              <div key={index} className="p-2 bg-white rounded border">
+                                <div className="grid grid-cols-[auto,1fr] gap-x-2">
+                                  <span className="font-medium">Text:</span>
+                                  <span>{entity.text}</span>
+                                  <span className="font-medium">Category:</span>
+                                  <span>{entity.category}</span>
+                                  <span className="font-medium">Confidence:</span>
+                                  <span>{(entity.confidenceScore * 100).toFixed(2)}%</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
+                      
+                      {userEntities.get(docIndex) && userEntities.get(docIndex)?.length > 0 && (
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium">User Defined Entities:</h4>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowUserEntities(!showUserEntities)}
+                              >
+                                {showUserEntities ? 'Collapse' : 'Expand'}
+                              </Button>
+                            </div>
+                          </div>
+                          {showUserEntities && (
+                            <div className="space-y-2 p-4 bg-gray-50 rounded min-h-[200px] overflow-auto">
+                              {userEntities.get(docIndex)?.map((entity, index) => (
+                                <div key={index} className="p-2 bg-white rounded border">
+                                  <div className="grid grid-cols-[auto,1fr] gap-x-2">
+                                    <span className="font-medium">Text:</span>
+                                    <span>{entity.text}</span>
+                                    <span className="font-medium">Category:</span>
+                                    <span>{entity.category}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
