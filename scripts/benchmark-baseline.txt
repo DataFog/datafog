@@ -1,0 +1,26 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/datafog/datafog-api/internal/scan
+cpu: Apple M3
+BenchmarkScanTextSmall-8        	   64513	     16559 ns/op	   3.62 MB/s	    6881 B/op	      51 allocs/op
+BenchmarkScanTextMedium-8       	   38298	     30559 ns/op	   3.99 MB/s	   12209 B/op	      54 allocs/op
+BenchmarkScanTextLarge-8        	    6988	    170732 ns/op	   2.88 MB/s	  158424 B/op	     193 allocs/op
+BenchmarkScanTextWithFilter-8   	  144634	      8321 ns/op	  14.66 MB/s	    1444 B/op	      12 allocs/op
+PASS
+ok  	github.com/datafog/datafog-api/internal/scan	5.508s
+goos: darwin
+goarch: arm64
+pkg: github.com/datafog/datafog-api/internal/policy
+cpu: Apple M3
+BenchmarkPolicyEvaluateSorted-8     	 7168506	       154.2 ns/op	      16 B/op	       1 allocs/op
+BenchmarkPolicyEvaluateUnsorted-8   	 2565021	       470.7 ns/op	    2136 B/op	       5 allocs/op
+PASS
+ok  	github.com/datafog/datafog-api/internal/policy	3.144s
+goos: darwin
+goarch: arm64
+pkg: github.com/datafog/datafog-api/internal/server
+cpu: Apple M3
+BenchmarkScanEndpoint-8     	   58554	     19254 ns/op	   3.38 MB/s	   15734 B/op	      99 allocs/op
+BenchmarkDecideEndpoint-8   	     405	   2923160 ns/op	   0.03 MB/s	   11742 B/op	      67 allocs/op
+PASS
+ok  	github.com/datafog/datafog-api/internal/server	3.022s

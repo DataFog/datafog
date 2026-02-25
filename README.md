@@ -379,4 +379,4 @@ spec:
 4. Environment variables are set and files are writable
 5. API token/header if `DATAFOG_API_TOKEN` is configured
 6. Policy JSON is valid and rules match expected action fields
-7. Optional benchmark sweep: `scripts/run-benchmarks.sh`
+7. Optional benchmark sweep: `scripts/run-benchmarks.sh` (writes `/tmp/bench/benchmark-current.txt`; if `scripts/benchmark-baseline.txt` exists, also writes `/tmp/bench/benchmark-trend.txt` with benchstat deltas)

@@ -50,15 +50,16 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.24.13"
-      - name: Run benchmark suites
+      - name: Run benchmark suites with trend report
         run: |
-          mkdir -p /tmp/bench
-          go test -run '^$' -bench "BenchmarkScanText|BenchmarkPolicyEvaluate|BenchmarkDecideEndpoint|BenchmarkScanEndpoint" -benchmem ./internal/scan ./internal/policy ./internal/server | tee /tmp/bench/benchmark.txt
-      - name: Upload benchmark artifact
+          bash scripts/run-benchmarks.sh
+      - name: Upload benchmark artifacts
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-results
-          path: /tmp/bench/benchmark.txt
+          path: |
+            /tmp/bench/benchmark-current.txt
+            /tmp/bench/benchmark-trend.txt
 
   race:
     runs-on: ubuntu-latest
