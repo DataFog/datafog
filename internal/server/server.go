@@ -95,6 +95,7 @@ func New(policyData models.Policy, store *receipts.ReceiptStore, logger *log.Log
 	if logger == nil {
 		logger = log.Default()
 	}
+	policyData = policy.NormalizeForEvaluation(policyData)
 	return &Server{
 		policy:      policyData,
 		store:       store,
@@ -421,7 +422,7 @@ func (s *Server) handleDecide(w http.ResponseWriter, r *http.Request) {
 	if len(findings) == 0 && req.Text != "" {
 		findings = scan.ScanText(req.Text, nil)
 	}
-	result := policy.Evaluate(s.policy, policy.DecisionContext{Action: req.Action, Findings: findings})
+	result := policy.EvaluateSorted(s.policy, policy.DecisionContext{Action: req.Action, Findings: findings})
 	actionHash, err := hashDecideAction(req.Action)
 	if err != nil {
 		s.respondError(w, http.StatusInternalServerError, models.APIError{Code: "hash_error", Message: "unable to hash action", Details: err.Error(), RequestID: requestID(r)})

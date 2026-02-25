@@ -143,6 +143,27 @@ var allowedModes = map[models.TransformMode]struct{}{
 	models.TransformModeHash:      {},
 }
 
+// NormalizeForEvaluation returns a copy of policy with rules sorted by priority descending.
+// Higher priority rules are evaluated first.
+func NormalizeForEvaluation(policy models.Policy) models.Policy {
+	rules := append([]models.Rule(nil), policy.Rules...)
+	sort.SliceStable(rules, func(i, j int) bool {
+		return rules[i].Priority > rules[j].Priority
+	})
+	policy.Rules = rules
+	return policy
+}
+
+// Evaluate evaluates a decision using policy rules.
+//
+// For hot paths, callers should use EvaluateSorted with a normalized policy
+// (created by NormalizeForEvaluation) to avoid repeated sorting.
+func Evaluate(policy models.Policy, ctx DecisionContext) DecisionResult {
+	return EvaluateSorted(NormalizeForEvaluation(policy), ctx)
+}
+
+// EvaluateSorted evaluates policy decisions assuming rules are already sorted
+// by priority descending.
 type DecisionContext struct {
 	Action   models.ActionMeta
 	Findings []models.ScanFinding
@@ -155,35 +176,7 @@ type DecisionResult struct {
 	Reason        string
 }
 
-var defaultEntityTransforms = []models.TransformStep{
-	{EntityType: "email", Mode: models.TransformModeMask},
-	{EntityType: "phone", Mode: models.TransformModeTokenize},
-	{EntityType: "ssn", Mode: models.TransformModeAnonymize},
-	{EntityType: "api_key", Mode: models.TransformModeRedact},
-	{EntityType: "credit_card", Mode: models.TransformModeRedact},
-	{EntityType: "ip_address", Mode: models.TransformModeMask},
-	{EntityType: "date", Mode: models.TransformModeMask},
-	{EntityType: "zip_code", Mode: models.TransformModeMask},
-	{EntityType: "person", Mode: models.TransformModeRedact},
-	{EntityType: "organization", Mode: models.TransformModeMask},
-	{EntityType: "location", Mode: models.TransformModeMask},
-}
-
-var defaultEntityTypes = map[string]struct{}{
-	"email":        {},
-	"phone":        {},
-	"ssn":          {},
-	"api_key":      {},
-	"credit_card":  {},
-	"ip_address":   {},
-	"date":         {},
-	"zip_code":     {},
-	"person":       {},
-	"organization": {},
-	"location":     {},
-}
-
-func Evaluate(policy models.Policy, ctx DecisionContext) DecisionResult {
+func EvaluateSorted(policy models.Policy, ctx DecisionContext) DecisionResult {
 	if ctx.Action.Type == "" {
 		return DecisionResult{
 			Decision: models.DecisionDeny,
@@ -198,10 +191,7 @@ func Evaluate(policy models.Policy, ctx DecisionContext) DecisionResult {
 		}
 	}
 
-	rules := append([]models.Rule(nil), policy.Rules...)
-	sort.SliceStable(rules, func(i, j int) bool {
-		return rules[i].Priority > rules[j].Priority
-	})
+	rules := policy.Rules
 
 	hasFindings := map[string]struct{}{}
 	for _, f := range ctx.Findings {
@@ -284,6 +274,34 @@ func Evaluate(policy models.Policy, ctx DecisionContext) DecisionResult {
 		Decision: models.DecisionDeny,
 		Reason:   "no matching rule",
 	}
+}
+
+var defaultEntityTransforms = []models.TransformStep{
+	{EntityType: "email", Mode: models.TransformModeMask},
+	{EntityType: "phone", Mode: models.TransformModeTokenize},
+	{EntityType: "ssn", Mode: models.TransformModeAnonymize},
+	{EntityType: "api_key", Mode: models.TransformModeRedact},
+	{EntityType: "credit_card", Mode: models.TransformModeRedact},
+	{EntityType: "ip_address", Mode: models.TransformModeMask},
+	{EntityType: "date", Mode: models.TransformModeMask},
+	{EntityType: "zip_code", Mode: models.TransformModeMask},
+	{EntityType: "person", Mode: models.TransformModeRedact},
+	{EntityType: "organization", Mode: models.TransformModeMask},
+	{EntityType: "location", Mode: models.TransformModeMask},
+}
+
+var defaultEntityTypes = map[string]struct{}{
+	"email":        {},
+	"phone":        {},
+	"ssn":          {},
+	"api_key":      {},
+	"credit_card":  {},
+	"ip_address":   {},
+	"date":         {},
+	"zip_code":     {},
+	"person":       {},
+	"organization": {},
+	"location":     {},
 }
 
 func matchAction(match models.MatchCriteria, requireSensitiveOnly bool, action models.ActionMeta) bool {

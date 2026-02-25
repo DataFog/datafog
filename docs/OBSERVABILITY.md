@@ -32,6 +32,19 @@ curl -s http://localhost:8080/metrics | jq .
 
 This can be scraped by Prometheus-compatible tooling or sampled by scripts for local checks.
 
+## Profiling
+
+Optional runtime profiling is available when `DATAFOG_PPROF_ADDR` is set:
+
+- standard pprof at `/debug/pprof/`
+- fgprof flamegraph endpoint at `/debug/fgprof` when `DATAFOG_FGPROF=true`
+
+```sh
+curl -s http://localhost:6060/debug/pprof/heap?debug=1 | head
+```
+
+Keep profiling endpoints off public networks unless authenticated or otherwise isolated.
+
 ## Traces
 
 Distributed tracing is not yet implemented in this repository. If you add tracing, preserve the request correlation fields (`x-request-id` / `X-Request-ID`) as the minimum boundary signal.

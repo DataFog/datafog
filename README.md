@@ -1,9 +1,12 @@
 # DataFog
 
-DataFog is a **policy-first Go service** for protecting sensitive data in AI agent and CLI workflows.
+**The data firewall for agents and developer tools.**
 
-It evaluates actions (for example: shell commands, file reads, and file writes) before they execute, and
-returns a concrete enforcement decision.
+DataFog is a runtime **data governance layer** for AI agents and developer tooling.
+
+It runs a single in-process policy loop: **detect → decide → enforce**.
+For each payload crossing a process boundary (command execution, file read/write, or API action),
+it detects sensitive entities, evaluates policy, and enforces the result before the action proceeds.
 
 This repo has two runtime pieces:
 
@@ -14,11 +17,12 @@ The wrapper process is still named `datafog-shim` for compatibility, but we desc
 
 ## What DataFog does (technical)
 
-1. **Scan text for sensitive entities** (`/v1/scan`).
-2. **Evaluate one action against policy rules** (`/v1/decide`).
-3. **Apply deterministic transforms** to detected entities (`/v1/transform`, `/v1/anonymize`).
-4. **Emit an auditable receipt** for each decision (`/v1/receipts/{id}`).
-5. **Optionally emit decision events** (`/v1/events`) when `DATAFOG_EVENTS_PATH` is set.
+1. **Detect** sensitive entities in text and payload context (`/v1/scan`).
+2. **Decide** using adapter-aware policy rules (`/v1/decide`) from `policy.json`.
+3. **Enforce** the decision before execution (`allow`, `transform`, `allow_with_redaction`, or `deny`) in consuming runtimes.
+4. **Transform or tokenize** matched data deterministically when a policy asks for it (`/v1/transform`, `/v1/anonymize`).
+5. **Emit an auditable receipt** for every enforcement decision (`/v1/receipts/{id}`).
+6. **Optionally emit decision events** (`/v1/events`) when `DATAFOG_EVENTS_PATH` is set.
 
 ## What it does not do
 
@@ -29,10 +33,16 @@ The wrapper process is still named `datafog-shim` for compatibility, but we desc
 
 ## Use cases
 
-- Stop risky AI/CLI actions before they run (for example: commands containing API keys).
-- Enforce redaction on files created or read by tools.
-- Build pre-commit/pre-execution guardrails for internal agents.
-- Keep an audit trail for decisions in a local JSONL receipt file.
+- Prevent sensitive data from crossing process boundaries before it leaves the machine (for example: a shell command exposing credentials or a script writing secret-bearing files).
+- Enforce policy-specific transformations such as masking, tokenization, or redaction at runtime.
+- Add pre-execution guardrails to AI agents and CLI workflows.
+- Keep auditable receipts/events for every policy decision.
+
+## Positioning
+
+- **Developers and agent builders:** DataFog is a **privacy firewall for CLI tools and AI agents**. It sits in your PATH or runtime, inspects what is flowing through your commands, and enforces policy before data-sensitive actions execute.
+- **Security/compliance buyers:** DataFog is runtime policy-as-code enforcement at the process level with receipts for every decision.
+- **Broader view:** DataFog is the **data plane for agent governance** — detect, decide, enforce, and audit—not just “PII redaction.”
 
 ## Repository layout
 
@@ -88,6 +98,8 @@ If you set `DATAFOG_API_TOKEN`, send it on every request using:
 | `DATAFOG_READ_HEADER_TIMEOUT` | `2s` | Request-header parse timeout |
 | `DATAFOG_IDLE_TIMEOUT` | `30s` | Idle keep-alive timeout |
 | `DATAFOG_SHUTDOWN_TIMEOUT` | `10s` | Graceful shutdown timeout |
+| `DATAFOG_PPROF_ADDR` | *(unset)* | If set, starts optional profiling server on this address (example `localhost:6060`) |
+| `DATAFOG_FGPROF` | `false` | Add `/debug/fgprof` endpoint to the profiling server |
 | `DATAFOG_ENABLE_DEMO` | *(unset)* | Enable `/demo*` endpoints |
 | `DATAFOG_DEMO_HTML` | `docs/demo.html` | Path to demo HTML |
 
@@ -117,6 +129,19 @@ Optional demo routes (only when demo mode is enabled):
 - `POST /demo/read-file`
 - `POST /demo/seed`
 - `GET /demo/sandbox`
+
+## Optional profiling endpoints
+
+For production debugging, set `DATAFOG_PPROF_ADDR` to run an auxiliary profiling server:
+
+- `/debug/pprof/` (standard net/http/pprof handlers: profiles, goroutines, heap, trace)
+- `/debug/fgprof` when `DATAFOG_FGPROF=true` (low-overhead flame graph style profiler)
+
+Recommended values:
+
+- `DATAFOG_PPROF_ADDR=:6060`
+
+The profiling server is disabled by default and should be exposed only on trusted networks.
 
 ## Decisions and idempotency
 
@@ -154,7 +179,7 @@ curl -X POST http://localhost:8080/v1/decide \
   }'
 ```
 
-### Transform detected PII in text
+### Transform detected sensitive data in text
 
 ```sh
 curl -X POST http://localhost:8080/v1/transform \
@@ -352,3 +377,4 @@ spec:
 3. Environment variables are set and files are writable
 4. API token/header if `DATAFOG_API_TOKEN` is configured
 5. Policy JSON is valid and rules match expected action fields
+6. Optional benchmark sweep: `scripts/run-benchmarks.sh`

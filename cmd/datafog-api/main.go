@@ -5,12 +5,15 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/felixge/fgprof"
 
 	"github.com/datafog/datafog-api/internal/policy"
 	"github.com/datafog/datafog-api/internal/receipts"
@@ -27,6 +30,8 @@ func main() {
 	shutdownTimeout := getenvDuration("DATAFOG_SHUTDOWN_TIMEOUT", 10*time.Second)
 	enableDemo := getenv("DATAFOG_ENABLE_DEMO", "") != "" || hasFlag("--enable-demo")
 	eventsPath := getenv("DATAFOG_EVENTS_PATH", "datafog_events.ndjson")
+	pprofAddr := getenv("DATAFOG_PPROF_ADDR", "")
+	fgprofEnabled := getenvBool("DATAFOG_FGPROF", false)
 
 	policyData, err := policy.LoadPolicyFromFile(policyPath)
 	if err != nil {
@@ -62,6 +67,11 @@ func main() {
 		handler = h.Handler()
 	}
 
+	var pprofSrv *http.Server
+	if pprofAddr != "" {
+		pprofSrv = startProfilingServer(pprofAddr, fgprofEnabled, log.Default())
+	}
+
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           handler,
@@ -93,6 +103,14 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
 
+		if pprofSrv != nil {
+			if err := pprofSrv.Shutdown(ctx); err != nil {
+				log.Printf("pprof server shutdown failed: %v", err)
+				if closeErr := pprofSrv.Close(); closeErr != nil && !errors.Is(closeErr, http.ErrServerClosed) {
+					log.Printf("pprof server forced close failed: %v", closeErr)
+				}
+			}
+		}
 		if err := srv.Shutdown(ctx); err != nil {
 			log.Printf("graceful shutdown failed: %v", err)
 			if closeErr := srv.Close(); closeErr != nil && !errors.Is(closeErr, http.ErrServerClosed) {
@@ -146,4 +164,35 @@ func hasFlag(flag string) bool {
 		}
 	}
 	return false
+}
+
+func getenvBool(key string, fallback bool) bool {
+	value := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
+	switch value {
+	case "1", "true", "t", "yes", "y", "on":
+		return true
+	case "0", "false", "f", "no", "n", "off":
+		return false
+	}
+	return fallback
+}
+
+func startProfilingServer(addr string, enableFGProf bool, logger *log.Logger) *http.Server {
+	mux := http.NewServeMux()
+	mux.Handle("/debug/pprof/", http.DefaultServeMux)
+	if enableFGProf {
+		mux.Handle("/debug/fgprof", fgprof.Handler())
+	}
+
+	srv := &http.Server{Addr: addr, Handler: mux}
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Printf("pprof server exited: %v", err)
+		}
+	}()
+	logger.Printf("pprof enabled at http://%s/debug/pprof/", addr)
+	if enableFGProf {
+		logger.Printf("fgprof enabled at http://%s/debug/fgprof", addr)
+	}
+	return srv
 }
