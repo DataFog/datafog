@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/felixge/fgprof"
+	"go.uber.org/automaxprocs/maxprocs"
 
 	"github.com/datafog/datafog-api/internal/policy"
 	"github.com/datafog/datafog-api/internal/receipts"
@@ -22,6 +23,9 @@ import (
 )
 
 func main() {
+	revertAuto := configureMaxProcs(log.Default())
+	defer revertAuto()
+
 	policyPath := getenv("DATAFOG_POLICY_PATH", "config/policy.json")
 	receiptPath := getenv("DATAFOG_RECEIPT_PATH", "datafog_receipts.jsonl")
 	apiToken := getenv("DATAFOG_API_TOKEN", "")
@@ -175,6 +179,20 @@ func getenvBool(key string, fallback bool) bool {
 		return false
 	}
 	return fallback
+}
+
+func configureMaxProcs(logger *log.Logger) func() {
+	if logger == nil {
+		logger = log.Default()
+	}
+	undo, err := maxprocs.Set(maxprocs.Logger(func(format string, args ...interface{}) {
+		logger.Printf(format, args...)
+	}))
+	if err != nil {
+		logger.Printf("maxprocs configuration skipped: %v", err)
+		return func() {}
+	}
+	return undo
 }
 
 func startProfilingServer(addr string, enableFGProf bool, logger *log.Logger) *http.Server {

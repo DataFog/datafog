@@ -98,6 +98,7 @@ If you set `DATAFOG_API_TOKEN`, send it on every request using:
 | `DATAFOG_READ_HEADER_TIMEOUT` | `2s` | Request-header parse timeout |
 | `DATAFOG_IDLE_TIMEOUT` | `30s` | Idle keep-alive timeout |
 | `DATAFOG_SHUTDOWN_TIMEOUT` | `10s` | Graceful shutdown timeout |
+| `GOMAXPROCS` | *(runtime default)* | Auto-tuned at startup to detected CPU limit; set explicitly to override |
 | `DATAFOG_PPROF_ADDR` | *(unset)* | If set, starts optional profiling server on this address (example `localhost:6060`) |
 | `DATAFOG_FGPROF` | `false` | Add `/debug/fgprof` endpoint to the profiling server |
 | `DATAFOG_ENABLE_DEMO` | *(unset)* | Enable `/demo*` endpoints |

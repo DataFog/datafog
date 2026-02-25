@@ -8,7 +8,12 @@ import (
 	"testing"
 
 	"github.com/datafog/datafog-api/internal/shim"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestParseMode(t *testing.T) {
 	t.Run("default", func(t *testing.T) {
