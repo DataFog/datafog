@@ -55,6 +55,7 @@ If `DATAFOG_RATE_LIMIT_RPS` is greater than `0`, requests are subject to a servi
 - `hash_error` (500)
 - `receipt_error` (500)
 - `internal_error` (500)
+- `events_read_error` (500)
 
 ## Endpoints
 
@@ -137,7 +138,7 @@ Scans free text and returns deterministic findings.
   "trace_id": "string",
   "findings": [
     {
-      "entity_type": "email|phone|ssn|api_key|credit_card",
+      "entity_type": "email|phone|ssn|api_key|credit_card|person|organization|location",
       "value": "string",
       "start": 0,
       "end": 5,
@@ -196,7 +197,7 @@ Evaluates action policy against findings and returns a deterministic decision.
   "policy_id": "string",
   "matched_rules": ["rule_id"],
   "transform_plan": [
-    { "entity_type": "email", "mode": "mask|tokenize|anonymize|redact" }
+    { "entity_type": "email", "mode": "mask|tokenize|anonymize|redact|replace|hash" }
   ],
   "findings": [
     {
@@ -221,7 +222,7 @@ Transforms text based on per-entity transforms.
 {
   "text": "string (required)",
   "findings": [],
-  "mode": "mask|tokenize|anonymize|redact",
+  "mode": "mask|tokenize|anonymize|redact|replace|hash",
   "entity_modes": {
     "email": "mask",
     "phone": "tokenize"
@@ -230,11 +231,12 @@ Transforms text based on per-entity transforms.
   "trace_id": "optional correlation id",
   "idempotency_key": "optional key for replay-safe dedupe"
 }
+```
 
-`transform` accepts only the documented modes (`mask`, `tokenize`, `anonymize`, `redact`) in both `mode` and `entity_modes` values.
+`transform` accepts only documented modes (`mask`, `tokenize`, `anonymize`, `redact`, `replace`, `hash`) in both `mode` and `entity_modes` values.
 Invalid transform mode values result in `400` with `code: invalid_request`.
 `entity_modes` must not contain empty keys.
-```
+
 
 #### Response 200
 
@@ -322,14 +324,67 @@ Returns persisted decision receipts.
     }
   ],
   "transform_plan": [
-    { "entity_type": "email", "mode": "mask|tokenize|anonymize|redact" }
+    { "entity_type": "email", "mode": "mask|tokenize|anonymize|redact|replace|hash" }
   ],
   "reason": "optional"
 }
 ```
+
+### `GET /v1/events`
+
+Returns decision events when `DATAFOG_EVENTS_PATH` is configured (or another reader is set).
+
+Query params:
+
+- `limit` (`1..1000`, default `100`)
+- `after` (RFC3339 timestamp)
+- `before` (RFC3339 timestamp)
+- `decision` (`allow|transform|allow_with_redaction|deny`)
+- `adapter` (tool/adapter filter, e.g. `claude`, `codex`)
+
+```json
+{
+  "events": [
+    {
+      "timestamp": "RFC3339 timestamp",
+      "mode": "enforced|observe",
+      "action_type": "string",
+      "tool": "string",
+      "resource": "string",
+      "command": "string",
+      "args": ["string"],
+      "sensitive": true,
+      "decision": "allow|transform|allow_with_redaction|deny",
+      "allowed": true,
+      "receipt_id": "string",
+      "matched_rules": ["string"],
+      "reason": "optional",
+      "check_error": "optional",
+      "request_id": "optional",
+      "trace_id": "optional"
+    }
+  ],
+  "total": 1
+}
+```
+
+If no events are configured or none match, return `{"events":[],"total":0}`.
 
 ## Idempotency
 
 - Supported endpoints: `POST /v1/scan`, `POST /v1/decide`, `POST /v1/transform`, `POST /v1/anonymize`.
 - Replaying the same idempotency key and identical semantic payload returns the same status and body.
 - Reusing a key with different payloads returns `409` and `code: idempotency_conflict`.
+
+## Optional demo endpoints (if enabled)
+
+The following routes are only available when the server is started with `DATAFOG_ENABLE_DEMO` or `--enable-demo`:
+
+- `GET /demo`
+- `POST /demo/exec`
+- `POST /demo/write-file`
+- `POST /demo/read-file`
+- `POST /demo/seed`
+- `GET /demo/sandbox`
+
+These return JSON payloads for execution and file operations and are intended for documentation/demo purposes only.

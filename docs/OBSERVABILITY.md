@@ -1,25 +1,65 @@
 ---
 title: "Observability"
-use_when: "Documenting logging, metrics, tracing, and health check conventions for this repo, including how agents can access signals to self-verify behavior."
+use_when: "Documenting logging, metrics, tracing, and health check conventions for this repo, including how agents can access signals to verify behavior."
 ---
 
 ## Logging Strategy
-- Prefer structured logs with consistent fields (service, env, request_id/trace_id, user_id when safe).
-- Never log secrets; be deliberate about PII.
-- Log at boundaries and on errors; avoid noisy per-loop logging in hot paths.
+
+DataFog logs request lifecycle events to stdout/stderr with request IDs.
+
+- Every completed API request logs `request_id`, method, path, status, and latency.
+- Panics are recovered and logged as 500 errors.
+- Receipt/event helper messages are logged to stderr (`decision=...`, `receipt=...`) by the policy gate and written to file sinks when configured.
+- Never emit raw request secrets or credentials in logs.
 
 ## Metrics
-- Track the golden signals: latency, traffic, errors, saturation.
-- Prefer histograms for latency; keep label cardinality low.
+
+In-process counters are exposed at `GET /metrics`:
+
+- `total_requests`
+- `error_requests`
+- `by_status`
+- `by_path`
+- `by_method`
+- `uptime_seconds`
+- `started_at`
+
+Use:
+
+```sh
+curl -s http://localhost:8080/metrics | jq .
+```
+
+This can be scraped by Prometheus-compatible tooling or sampled by scripts for local checks.
 
 ## Traces
-- Propagate trace context across service boundaries.
-- Trace the critical paths (requests, background jobs) with stable span names.
+
+Distributed tracing is not yet implemented in this repository. If you add tracing, preserve the request correlation fields (`x-request-id` / `X-Request-ID`) as the minimum boundary signal.
 
 ## Health Checks
-- Health checks are fast and deterministic; readiness reflects dependency availability when needed.
-- Document expected status codes and what "unhealthy" means operationally.
+
+- `GET /health` returns `200` with policy identity and startup timestamp when service is ready.
+- Failures show non-200 and error payloads without panicking side effects.
+
+Use:
+
+```sh
+curl -i http://localhost:8080/health
+```
+
+## Event and decision introspection
+
+- Configure `DATAFOG_EVENTS_PATH` to emit NDJSON decision events.
+- Query events through `GET /v1/events` with optional filters:
+
+```sh
+curl 'http://localhost:8080/v1/events?limit=20&decision=deny'
+curl 'http://localhost:8080/v1/events?adapter=claude&after=2026-02-24T00:00:00Z'
+```
 
 ## Agent Access
-- Provide at least one concrete way to query each signal (logs, metrics, traces) without tribal knowledge.
-- Include 1-2 copy-pastable examples per signal once the stack is known (commands, URLs, or queries).
+
+- Start by checking `/health` and `/metrics` after boot.
+- Reproduce a request and inspect the returned `receipt_id`.
+- Pull the immutable receipt: `GET /v1/receipts/{id}`.
+- Confirm enforcement events with optional filtering from `/v1/events`.

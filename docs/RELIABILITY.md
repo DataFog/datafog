@@ -5,58 +5,58 @@ use_when: "Capturing reliability goals, failure modes, monitoring, and operation
 
 ## Reliability goals (MVP)
 
-- Primary flow (`POST /v1/scan`): 99.9% availability, p95 latency below 250ms at steady load.
-- Policy and redaction consistency (`POST /v1/decide`, `POST /v1/transform`, `POST /v1/anonymize`): 99.5% availability, p95 latency below 350ms.
-- Health signal (`GET /health`): 99.99% availability for readiness/liveness checks.
+- Core API availability: target `99.9%` service availability.
+- Primary decision path (`POST /v1/decide`) latency should remain low and stable under sustained load.
+- `/health` should remain fast and dependable for liveness/readiness checks.
 
-Definition of degraded:
+Definition of degraded (for operational alerts):
 
-- Availability below target for 5-minute windows.
-- p95 latency sustained > 1.5x target for 10 minutes.
-- Error rate > 1% for any public endpoint.
+- Endpoint errors above normal baseline for 5+ minute windows.
+- Repeated `429` bursts with no clear client-side remediation.
+- Sustained startup failures or repeated process restarts.
 
 ## Failure Modes
 
 Top failures and controls:
 
-- Policy file missing or invalid JSON:
-  - Signal: `policy_load_failed_total` increases, `/health` may degrade.
-  - Blast radius: all scan/decide/transform calls fail.
-  - Recovery: roll back to last known-good `config/policy.json`, fix schema, redeploy.
+- **Invalid/missing policy file:**
+  - Signal: startup failure (process exits), `not found`/schema logs.
+  - Blast radius: full API path fails to start.
+  - Recovery: fix policy JSON, validate `policy_id`/`policy_version`, and restart.
 
-- Receipt path write failure:
-  - Signal: request-level `receipt_write_failed` metric spikes, partial request successes.
-  - Blast radius: observability of decisions degrades first; policy logic still runs.
-  - Recovery: fix filesystem permissions, point to healthy `DATAFOG_RECEIPT_PATH`, restart.
+- **Receipt persistence failure:**
+  - Signal: `/v1/decide` returns internal errors, repeated `receipt_error`.
+  - Blast radius: policy enforcement decisions may degrade as persistence is required.
+  - Recovery: verify `DATAFOG_RECEIPT_PATH` permissions and disk health, or relocate path.
 
-- Rate limit configuration too low or malformed:
-  - Signal: sudden `429` rise and client-side retries.
-  - Blast radius: throughput reduction for bursty clients.
-  - Recovery: validate and tune `DATAFOG_RATE_LIMIT_RPS`, deploy config change.
+- **Rate limit misconfiguration:**
+  - Signal: sudden `429` rise (`rate_limited`).
+  - Blast radius: throttling of legitimate traffic.
+  - Recovery: tune `DATAFOG_RATE_LIMIT_RPS` per environment profile.
 
-- Bad deployment image or env drift:
-  - Signal: crash/restart loop, increased non-2xx responses.
-  - Blast radius: endpoint unavailability.
-  - Recovery: rollback image/version and redeploy after diff review.
+- **Shutdown behavior:**
+  - Signal: long process termination, orphaned requests.
+  - Recovery: respect `DATAFOG_SHUTDOWN_TIMEOUT`; verify SIGTERM/SIGINT handling in runbook.
 
 ## Monitoring
 
-Minimum signal set:
+Minimum signal set (all from first-party endpoints):
 
-- Error rate by endpoint and status code.
-- p95/p99 latency per endpoint.
-- `/health` pass/fail and startup duration.
-- `DATAFOG_RATE_LIMIT_RPS` rejections.
-- Receipt persistence success rate.
+- Error rate by endpoint/path/status from `/metrics`.
+- Request volume and traffic mix from `/metrics`.
+- `GET /health` response time and status for readiness/liveness.
+- Receipt file write errors in logs.
 
-Alert rules:
+Alerting should focus on:
 
-- Page if SLO burn reaches 10% remaining over 10 minutes.
-- Page on crash loop, persistent readiness failure, or error budget burn above threshold.
-- Warn on sustained latency regression above 2x target for two consecutive intervals.
+- sustained error-rate increases with low traffic baselines,
+- process restart loops,
+- blocked authentication spikes (`401`),
+- persistent write failures or full disks on receipt/event paths.
 
 ## Operational Guardrails
 
-- Keep configuration centralized and immutable per release (`policy`, env vars, receipt path).
-- Every change must include a verified rollback command or known Git point-in-time for the container image and config map.
-- Prefer controlled rollout with canaries for policy schema changes and rate-limit changes.
+- Keep config explicit and versioned (`policy.json`, deployment manifests, env settings).
+- Deploy policy changes through normal rollout controls (staging + canary when possible).
+- Rotate credentials and tokens on incidents.
+- Document rollback path before enabling policy or enforcement changes in production.

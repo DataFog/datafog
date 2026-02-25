@@ -14,7 +14,7 @@ adds policy checkpoints to OpenAI Codex without changing how users run Codex day
 
 The end state is:
 - a normal `codex` command still works,
-- every side-effect action passes through `datafog-shim` before execution,
+- every side-effect action passes through `datafog-shim`'s policy gate before execution,
 - policy decisions and enforcement mode are explicit and reversible,
 - setup can be validated in under two minutes.
 
@@ -27,7 +27,7 @@ The flow is intentionally:
 1. Start policy service.
 2. Run one bootstrap command.
 3. Source one generated env file.
-4. Keep PATH updated with shim dir.
+4. Keep PATH updated with the policy-gate wrapper directory.
 
 This makes "I have policy-aware coding agent behavior" a predictable sequence rather than a long shell script to memorize.
 
@@ -35,7 +35,7 @@ This makes "I have policy-aware coding agent behavior" a predictable sequence ra
 
 - `datafog-api` running and reachable (for example `http://localhost:8080`).
 - `codex` binary on PATH or available by absolute path.
-- `go` installed for shim build (first run only).
+- `go` installed for policy gate wrapper build (first run only).
 - Write access to shell startup files is optional: the runbook can stay in dry-run mode first.
 
 ## Fast setup flow
@@ -50,7 +50,7 @@ chmod +x scripts/codex-datafog-setup.sh
 The script:
 
 - Builds `datafog-shim` (if needed),
-- Installs a managed shim named `codex`,
+- Installs a managed policy-gate wrapper named `codex`,
 - Writes a helper env file `~/.datafog/codex-datafog.env`,
 - Shows a minimal activation checklist.
 
@@ -63,7 +63,7 @@ source ~/.datafog/codex-datafog.env
 export PATH="$HOME/.datafog/shims:$PATH"
 ```
 
-Expected behavior after this is that running `which codex` should resolve to the shim path in `~/.datafog/shims`.
+Expected behavior after this is that running `which codex` resolves to the managed policy-gate wrapper in `~/.datafog/shims`.
 
 ## Verification
 
@@ -75,7 +75,7 @@ DATAFOG_SHIM_API_TOKEN="<token_if_configured>" codex --help
 
 With policy defaults in place, if there is a matching policy rule for the command action metadata:
 - allow/allow_with_redaction: command executes and emits decision info,
-- deny/transform: command is blocked with a visible `PolicyDecisionError` in the shim output.
+- deny/transform: command is blocked with a visible `PolicyDecisionError` in the policy-gate output.
 
 Audit evidence can be checked by reading the configured sink:
 
@@ -90,11 +90,11 @@ Expected NDJSON events include action type, tool `codex`, decision, and request 
 - `--mode observe` for non-blocking rollout.
 - `--mode enforced` for hard blocking.
 - `--api-token` to enforce tokened policy API requests.
-- `--install-git` to additionally gate `git` through the same shim family.
+- `--install-git` to additionally gate `git` through the same policy-gate family.
 
 ## Recovery and escape hatch
 
-If a user is blocked during onboarding, run the shim in observe mode to collect logs:
+If a user is blocked during onboarding, run the policy gate in observe mode to collect logs:
 
 ```sh
 ./scripts/codex-datafog-setup.sh --policy-url http://localhost:8080 --mode observe
