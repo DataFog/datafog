@@ -2,9 +2,6 @@ package scan
 
 import (
 	"regexp"
-	"sort"
-	"strconv"
-	"strings"
 
 	"github.com/datafog/datafog-api/internal/models"
 )
@@ -67,53 +64,52 @@ var DefaultEntityConfidences = map[string]float64{
 	"zip_code":    0.80,
 }
 
+var defaultScanEntityTypes = []string{
+	"api_key",
+	"credit_card",
+	"date",
+	"email",
+	"ip_address",
+	"phone",
+	"ssn",
+	"zip_code",
+}
+
 func ScanText(text string, entityFilter []string) []models.ScanFinding {
-	requested := map[string]struct{}{}
-	if len(entityFilter) > 0 {
-		for _, name := range entityFilter {
-			requested[strings.ToLower(strings.TrimSpace(name))] = struct{}{}
-		}
-	}
+	requested := requestedEntitySet(entityFilter)
 
 	findings := make([]models.ScanFinding, 0)
 
 	// Phase 1: Regex engine (fast, always available)
-	entityTypes := make([]string, 0, len(DefaultEntityPatterns))
-	for entityType := range DefaultEntityPatterns {
-		entityTypes = append(entityTypes, entityType)
+	for _, entityType := range defaultScanEntityTypes {
+		if shouldRunEntityType(requested, entityType) {
+			pattern := DefaultEntityPatterns[entityType]
+			idxs := pattern.Re.FindAllStringIndex(text, -1)
+			for _, idx := range idxs {
+				if len(idx) != 2 || idx[0] < 0 || idx[1] < idx[0] {
+					continue
+				}
+				value := text[idx[0]:idx[1]]
+				if pattern.Validate != nil && !pattern.Validate(value) {
+					continue
+				}
+				findings = append(findings, models.ScanFinding{
+					EntityType: entityType,
+					Value:      value,
+					Start:      idx[0],
+					End:        idx[1],
+					Confidence: DefaultEntityConfidences[entityType],
+				})
+			}
+		}
 	}
-	sort.Strings(entityTypes)
 
-	for _, entityType := range entityTypes {
-		pattern := DefaultEntityPatterns[entityType]
-		if len(requested) > 0 {
-			if _, ok := requested[entityType]; !ok {
-				continue
-			}
-		}
-
-		idxs := pattern.Re.FindAllStringIndex(text, -1)
-		for _, idx := range idxs {
-			if len(idx) != 2 || idx[0] < 0 || idx[1] < idx[0] {
-				continue
-			}
-			value := text[idx[0]:idx[1]]
-			if pattern.Validate != nil && !pattern.Validate(value) {
-				continue
-			}
-			findings = append(findings, models.ScanFinding{
-				EntityType: entityType,
-				Value:      value,
-				Start:      idx[0],
-				End:        idx[1],
-				Confidence: DefaultEntityConfidences[entityType],
-			})
-		}
+	if !shouldRunNERForFilter(requested) {
+		return findings
 	}
 
 	// Phase 2: NER engine (heuristic, when enabled)
-	nerFindings := ScanNER(text, entityFilter)
-	findings = append(findings, nerFindings...)
+	findings = append(findings, scanNERWithFilter(text, requested)...)
 
 	return findings
 }
@@ -121,24 +117,30 @@ func ScanText(text string, entityFilter []string) []models.ScanFinding {
 // luhnValid implements the Luhn algorithm to validate credit card numbers.
 // It strips spaces and dashes before checking.
 func luhnValid(s string) bool {
-	// Strip spaces and dashes
-	var digits []int
+	var digits [19]int
+	n := 0
+
 	for _, ch := range s {
-		if ch >= '0' && ch <= '9' {
-			digits = append(digits, int(ch-'0'))
-		} else if ch == ' ' || ch == '-' {
+		switch {
+		case ch >= '0' && ch <= '9':
+			if n == len(digits) {
+				return false
+			}
+			digits[n] = int(ch - '0')
+			n++
+		case ch == ' ' || ch == '-':
 			continue
-		} else {
+		default:
 			return false
 		}
 	}
-	if len(digits) < 13 || len(digits) > 19 {
+	if n < 13 || n > 19 {
 		return false
 	}
 
 	sum := 0
 	double := false
-	for i := len(digits) - 1; i >= 0; i-- {
+	for i := n - 1; i >= 0; i-- {
 		d := digits[i]
 		if double {
 			d *= 2
@@ -154,18 +156,44 @@ func luhnValid(s string) bool {
 
 // ipv4Valid checks that each octet is 0-255.
 func ipv4Valid(s string) bool {
-	parts := strings.Split(s, ".")
-	if len(parts) != 4 {
+	if len(s) == 0 {
 		return false
 	}
-	for _, part := range parts {
-		n, err := strconv.Atoi(part)
-		if err != nil {
+
+	octetCount := 0
+	value := 0
+	digitsInOctet := 0
+
+	for i := 0; i <= len(s); i++ {
+		if i == len(s) || s[i] == '.' {
+			if digitsInOctet == 0 {
+				return false
+			}
+			if value < 0 || value > 255 {
+				return false
+			}
+			octetCount++
+			if octetCount > 4 {
+				return false
+			}
+			if i == len(s) {
+				break
+			}
+			value = 0
+			digitsInOctet = 0
+			continue
+		}
+
+		ch := s[i]
+		if ch < '0' || ch > '9' {
 			return false
 		}
-		if n < 0 || n > 255 {
+		value = value*10 + int(ch-'0')
+		digitsInOctet++
+		if digitsInOctet > 3 {
 			return false
 		}
 	}
-	return true
+
+	return octetCount == 4
 }
