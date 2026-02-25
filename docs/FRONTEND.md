@@ -1,24 +1,34 @@
 ---
 title: "Frontend"
-use_when: "Documenting frontend stack, conventions, component architecture, performance budgets, and accessibility requirements for this repo."
+use_when: "Documenting frontend stack conventions and UI touchpoints for this repo."
 ---
 
 ## Stack
-- Define supported browsers/platforms and the minimum accessibility target.
-- Prefer a small set of core dependencies and consistent build tooling across the app.
+
+DataFog API is a backend-first project. There is no React/Vue/Next.js application in this repository.
+
+- Primary user-facing UI is API-first: clients interact through HTTP endpoints.
+- Optional demo assets are static HTML in `docs/demo.html` and rendered by `GET /demo` when demo mode is enabled.
 
 ## Conventions
-- Keep components small and named by what they do; avoid "utils soup" without ownership.
-- Centralize shared UI primitives; avoid duplicating patterns across pages.
+
+- Keep behavior explicit and minimal in UI entrypoints.
+- Avoid introducing framework lock-in for optional demo surfaces.
+- Maintain parity between API behavior and demo output (e.g., transformed/blocked responses in demo should mirror API semantics).
 
 ## Component Architecture
-- Separate UI rendering from data fetching/mutations where practical.
-- Prefer explicit data flow and local state; introduce global state only with a clear boundary.
+
+- `internal/server` owns all HTTP handlers, including demo handlers (`internal/server/demo.go`).
+- Demo UI is static and delegates control flow to the API; business rules remain server-side.
+- Policy gate behavior belongs to `internal/shim` and should not duplicate policy logic in the UI.
 
 ## Performance
-- Avoid unnecessary client work: minimize re-renders, split code on route/feature boundaries, and lazy-load heavy modules.
-- Measure before optimizing; keep a short list of performance budgets that matter to users.
+
+- No frontend bundling/runtime overhead is shipped as part of the core service.
+- For optional demo HTML, prefer lightweight markup/CSS/vanilla JS and short payloads from the API.
 
 ## Accessibility
-- Keyboard navigation works for all interactive controls; focus states are visible.
-- Use semantic HTML first; ARIA is for filling gaps, not replacing semantics.
+
+- Demo HTML should remain keyboard-operable and avoid hidden controls that block screen readers.
+- Use semantic markup in docs pages (`button`, `section`, headings, labels).
+- Keep contrast and focus states explicit when editing future visual components.

@@ -3,7 +3,21 @@ package main
 import (
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
+
+func TestConfigureMaxProcs(t *testing.T) {
+	revert := configureMaxProcs(nil)
+	if revert == nil {
+		t.Fatalf("expected configureMaxProcs to return a revert function")
+	}
+	revert()
+}
 
 func TestGetenvDuration(t *testing.T) {
 	t.Run("fallback_when_missing", func(t *testing.T) {

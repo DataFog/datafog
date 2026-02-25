@@ -155,6 +155,8 @@ func (s *ReceiptStore) loadExistingReceipts() error {
 
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 64*1024), maxReceiptLineBytes)
+
+	badLines := 0
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
@@ -162,13 +164,18 @@ func (s *ReceiptStore) loadExistingReceipts() error {
 		}
 		var receipt models.Receipt
 		if err := json.Unmarshal([]byte(line), &receipt); err != nil {
-			return fmt.Errorf("decode existing receipt: %w", err)
+			badLines++
+			continue
 		}
 		s.receipts[receipt.ReceiptID] = receipt
 		s.entryCount++
 	}
 	if err := scanner.Err(); err != nil {
 		return err
+	}
+
+	if badLines > 0 && len(s.receipts) == 0 {
+		return fmt.Errorf("decode existing receipt: no valid receipt records found in %s (bad lines: %d)", s.filePath, badLines)
 	}
 	return nil
 }

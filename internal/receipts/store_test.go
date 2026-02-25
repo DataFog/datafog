@@ -72,6 +72,33 @@ func TestReceiptStoreLoadsExistingReceipts(t *testing.T) {
 	}
 }
 
+func TestReceiptStoreSkipsCorruptReceiptLines(t *testing.T) {
+	path := t.TempDir() + "/receipts.jsonl"
+	good := models.Receipt{
+		ReceiptID:     "receipt-good",
+		PolicyID:      "policy-1",
+		PolicyVersion: "v1",
+		Decision:      models.DecisionAllow,
+	}
+	data, err := json.Marshal(good)
+	if err != nil {
+		t.Fatalf("marshal good receipt failed: %v", err)
+	}
+	if err := os.WriteFile(path, append([]byte("{\n"), append(data, '\n')...), 0o644); err != nil {
+		t.Fatalf("seed file write failed: %v", err)
+	}
+
+	store, err := NewReceiptStore(path)
+	if err != nil {
+		t.Fatalf("expected corrupt+good receipts to load, got %v", err)
+	}
+	if got, ok := store.Get("receipt-good"); !ok {
+		t.Fatalf("expected good receipt loaded")
+	} else if got.ReceiptID != "receipt-good" {
+		t.Fatalf("expected loaded receipt id, got %q", got.ReceiptID)
+	}
+}
+
 func TestReceiptStoreRejectsCorruptReceiptLine(t *testing.T) {
 	path := t.TempDir() + "/receipts.jsonl"
 	if err := os.WriteFile(path, []byte("{\n"), 0o644); err != nil {

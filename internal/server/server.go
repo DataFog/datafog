@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datafog/datafog-api/internal/adapters"
 	"github.com/datafog/datafog-api/internal/models"
 	"github.com/datafog/datafog-api/internal/policy"
 	"github.com/datafog/datafog-api/internal/receipts"
@@ -27,24 +28,27 @@ import (
 )
 
 type Server struct {
-	policy      models.Policy
-	store       *receipts.ReceiptStore
-	eventReader shim.EventReader
-	apiToken    string
-	rateLimiter *tokenBucket
-	startedAt   time.Time
-	logger      *log.Logger
-	mu          sync.Mutex
-	statsMu     sync.Mutex
-	decisions   map[string]idempotentDecision
-	scans       map[string]idempotentCachedResponse
-	transforms  map[string]idempotentCachedResponse
-	anonymizes  map[string]idempotentCachedResponse
-	totalCount  int64
-	errorCount  int64
-	statusHits  map[int]int64
-	pathHits    map[string]int64
-	methodHits  map[string]int64
+	policy            models.Policy
+	store             *receipts.ReceiptStore
+	eventReader       shim.EventReader
+	apiToken          string
+	rateLimiter       *tokenBucket
+	startedAt         time.Time
+	logger            *log.Logger
+	mu                sync.Mutex
+	statsMu           sync.Mutex
+	decisions         map[string]idempotentDecision
+	scans             map[string]idempotentCachedResponse
+	transforms        map[string]idempotentCachedResponse
+	anonymizes        map[string]idempotentCachedResponse
+	totalCount        int64
+	errorCount        int64
+	statusHits        map[int]int64
+	pathHits          map[string]int64
+	methodHits        map[string]int64
+	totalLatencyNs    int64
+	pathLatencyNs     map[string]int64
+	pathLatencyCounts map[string]int64
 }
 
 type requestIDContextKey struct{}
@@ -82,33 +86,39 @@ type idempotentCachedResponse struct {
 }
 
 type metricsResponse struct {
-	TotalRequests int64            `json:"total_requests"`
-	ErrorRequests int64            `json:"error_requests"`
-	ByStatus      map[string]int64 `json:"by_status"`
-	ByPath        map[string]int64 `json:"by_path"`
-	ByMethod      map[string]int64 `json:"by_method"`
-	StartedAt     string           `json:"started_at"`
-	UptimeSeconds float64          `json:"uptime_seconds"`
+	TotalRequests int64              `json:"total_requests"`
+	ErrorRequests int64              `json:"error_requests"`
+	ByStatus      map[string]int64   `json:"by_status"`
+	ByPath        map[string]int64   `json:"by_path"`
+	ByMethod      map[string]int64   `json:"by_method"`
+	ByPathLatency map[string]float64 `json:"by_path_avg_latency_ms"`
+	AvgLatencyMs  float64            `json:"avg_latency_ms"`
+	StartedAt     string             `json:"started_at"`
+	UptimeSeconds float64            `json:"uptime_seconds"`
 }
 
 func New(policyData models.Policy, store *receipts.ReceiptStore, logger *log.Logger, apiToken string, rateLimitRPS int) *Server {
 	if logger == nil {
 		logger = log.Default()
 	}
+	policyData = policy.NormalizeForEvaluation(policyData)
 	return &Server{
-		policy:      policyData,
-		store:       store,
-		apiToken:    apiToken,
-		rateLimiter: newTokenBucket(rateLimitRPS),
-		startedAt:   time.Now().UTC(),
-		logger:      logger,
-		decisions:   map[string]idempotentDecision{},
-		scans:       map[string]idempotentCachedResponse{},
-		transforms:  map[string]idempotentCachedResponse{},
-		anonymizes:  map[string]idempotentCachedResponse{},
-		statusHits:  map[int]int64{},
-		pathHits:    map[string]int64{},
-		methodHits:  map[string]int64{},
+		policy:            policyData,
+		store:             store,
+		apiToken:          apiToken,
+		rateLimiter:       newTokenBucket(rateLimitRPS),
+		startedAt:         time.Now().UTC(),
+		logger:            logger,
+		decisions:         map[string]idempotentDecision{},
+		scans:             map[string]idempotentCachedResponse{},
+		transforms:        map[string]idempotentCachedResponse{},
+		anonymizes:        map[string]idempotentCachedResponse{},
+		statusHits:        map[int]int64{},
+		pathHits:          map[string]int64{},
+		methodHits:        map[string]int64{},
+		totalLatencyNs:    0,
+		pathLatencyNs:     map[string]int64{},
+		pathLatencyCounts: map[string]int64{},
 	}
 }
 
@@ -163,6 +173,7 @@ func (s *Server) wrapMiddleware(mux *http.ServeMux) http.Handler {
 		startedAt := time.Now()
 		handler, pattern := mux.Handler(r)
 		defer func() {
+			latency := time.Since(startedAt)
 			if rec := recover(); rec != nil {
 				responseWriter.status = http.StatusInternalServerError
 				s.logger.Printf("request panic request_id=%s method=%s path=%s err=%v", reqID, r.Method, r.URL.Path, rec)
@@ -172,11 +183,11 @@ func (s *Server) wrapMiddleware(mux *http.ServeMux) http.Handler {
 				responseWriter.status = http.StatusOK
 			}
 			if pattern == "" {
-				s.recordRequestMetrics(r.Method, "/_not_found", responseWriter.status)
+				s.recordRequestMetrics(r.Method, "/_not_found", responseWriter.status, latency)
 			} else {
-				s.recordRequestMetrics(r.Method, canonicalizedRoute(pattern, r.URL.Path), responseWriter.status)
+				s.recordRequestMetrics(r.Method, canonicalizedRoute(pattern, r.URL.Path), responseWriter.status, latency)
 			}
-			s.logger.Printf("request complete request_id=%s method=%s path=%s status=%d latency_ms=%d", reqID, r.Method, r.URL.Path, responseWriter.status, time.Since(startedAt).Milliseconds())
+			s.logger.Printf("request complete request_id=%s method=%s path=%s status=%d latency_ms=%d", reqID, r.Method, r.URL.Path, responseWriter.status, latency.Milliseconds())
 		}()
 
 		if !s.authorized(r) {
@@ -274,7 +285,7 @@ func canonicalizedRoute(pattern string, path string) string {
 	return pattern
 }
 
-func (s *Server) recordRequestMetrics(method string, route string, status int) {
+func (s *Server) recordRequestMetrics(method string, route string, status int, latency time.Duration) {
 	s.statsMu.Lock()
 	defer s.statsMu.Unlock()
 	s.totalCount++
@@ -284,6 +295,11 @@ func (s *Server) recordRequestMetrics(method string, route string, status int) {
 	if status >= 400 {
 		s.errorCount++
 	}
+
+	latencyNs := latency.Nanoseconds()
+	s.totalLatencyNs += latencyNs
+	s.pathLatencyNs[route] += latencyNs
+	s.pathLatencyCounts[route]++
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -421,7 +437,7 @@ func (s *Server) handleDecide(w http.ResponseWriter, r *http.Request) {
 	if len(findings) == 0 && req.Text != "" {
 		findings = scan.ScanText(req.Text, nil)
 	}
-	result := policy.Evaluate(s.policy, policy.DecisionContext{Action: req.Action, Findings: findings})
+	result := policy.EvaluateSorted(s.policy, policy.DecisionContext{Action: req.Action, Findings: findings})
 	actionHash, err := hashDecideAction(req.Action)
 	if err != nil {
 		s.respondError(w, http.StatusInternalServerError, models.APIError{Code: "hash_error", Message: "unable to hash action", Details: err.Error(), RequestID: requestID(r)})
@@ -692,8 +708,12 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	if decision := r.URL.Query().Get("decision"); decision != "" {
 		q.Decision = decision
 	}
-	if adapter := r.URL.Query().Get("adapter"); adapter != "" {
-		q.Adapter = adapter
+	if adapter := strings.TrimSpace(r.URL.Query().Get("adapter")); adapter != "" {
+		if canonical, ok := adapters.Canonical(strings.ToLower(adapter)); ok {
+			q.Adapter = canonical
+		} else {
+			q.Adapter = strings.ToLower(adapter)
+		}
 	}
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
 		if n, err := strconv.Atoi(limitStr); err == nil && n > 0 && n <= 1000 {
@@ -739,12 +759,27 @@ func (s *Server) snapshotMetrics() metricsResponse {
 		byMethod[method] = count
 	}
 
+	byPathLatency := map[string]float64{}
+	for path, count := range s.pathLatencyCounts {
+		if count == 0 {
+			continue
+		}
+		byPathLatency[path] = float64(s.pathLatencyNs[path]) / float64(count) / float64(time.Millisecond)
+	}
+
+	avgLatencyMs := 0.0
+	if s.totalCount > 0 {
+		avgLatencyMs = float64(s.totalLatencyNs) / float64(s.totalCount) / float64(time.Millisecond)
+	}
+
 	return metricsResponse{
 		TotalRequests: s.totalCount,
 		ErrorRequests: s.errorCount,
 		ByStatus:      byStatus,
 		ByPath:        byPath,
 		ByMethod:      byMethod,
+		ByPathLatency: byPathLatency,
+		AvgLatencyMs:  avgLatencyMs,
 		StartedAt:     s.startedAt.Format(time.RFC3339),
 		UptimeSeconds: time.Since(s.startedAt).Seconds(),
 	}

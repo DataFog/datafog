@@ -40,3 +40,35 @@ jobs:
         govulncheck ./...
     - name: Build container image
       run: docker build . --file Dockerfile --tag datafog-api:$(date +%s)
+
+  benchmark:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.13"
+      - name: Run benchmark suites with trend report
+        run: |
+          bash scripts/run-benchmarks.sh
+      - name: Upload benchmark artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            /tmp/bench/benchmark-current.txt
+            /tmp/bench/benchmark-trend.txt
+
+  race:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.13"
+      - name: Run race detector
+        run: go test -race ./...

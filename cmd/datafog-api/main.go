@@ -5,12 +5,16 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/felixge/fgprof"
+	"go.uber.org/automaxprocs/maxprocs"
 
 	"github.com/datafog/datafog-api/internal/policy"
 	"github.com/datafog/datafog-api/internal/receipts"
@@ -19,6 +23,9 @@ import (
 )
 
 func main() {
+	revertAuto := configureMaxProcs(log.Default())
+	defer revertAuto()
+
 	policyPath := getenv("DATAFOG_POLICY_PATH", "config/policy.json")
 	receiptPath := getenv("DATAFOG_RECEIPT_PATH", "datafog_receipts.jsonl")
 	apiToken := getenv("DATAFOG_API_TOKEN", "")
@@ -26,7 +33,9 @@ func main() {
 	rateLimitRPS := getenvInt("DATAFOG_RATE_LIMIT_RPS", 0)
 	shutdownTimeout := getenvDuration("DATAFOG_SHUTDOWN_TIMEOUT", 10*time.Second)
 	enableDemo := getenv("DATAFOG_ENABLE_DEMO", "") != "" || hasFlag("--enable-demo")
-	eventsPath := getenv("DATAFOG_EVENTS_PATH", "datafog_events.ndjson")
+	eventsPath := getenv("DATAFOG_EVENTS_PATH", "")
+	pprofAddr := getenv("DATAFOG_PPROF_ADDR", "")
+	fgprofEnabled := getenvBool("DATAFOG_FGPROF", false)
 
 	policyData, err := policy.LoadPolicyFromFile(policyPath)
 	if err != nil {
@@ -38,10 +47,18 @@ func main() {
 		log.Fatalf("init receipts: %v", err)
 	}
 
-	eventSink := shim.NewNDJSONDecisionEventSink(eventsPath)
+	var eventSink shim.DecisionEventSink
+	var eventReader shim.EventReader
+	if eventsPath != "" {
+		eventStore := shim.NewNDJSONDecisionEventSink(eventsPath)
+		eventSink = eventStore
+		eventReader = eventStore
+	}
 
 	h := server.New(policyData, store, log.Default(), apiToken, rateLimitRPS)
-	h.SetEventReader(eventSink)
+	if eventReader != nil {
+		h.SetEventReader(eventReader)
+	}
 
 	var handler http.Handler
 	if enableDemo {
@@ -60,6 +77,11 @@ func main() {
 		log.Printf("demo mode enabled — /demo/exec, /demo/write-file, /demo/read-file available")
 	} else {
 		handler = h.Handler()
+	}
+
+	var pprofSrv *http.Server
+	if pprofAddr != "" {
+		pprofSrv = startProfilingServer(pprofAddr, fgprofEnabled, log.Default())
 	}
 
 	srv := &http.Server{
@@ -93,6 +115,14 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
 
+		if pprofSrv != nil {
+			if err := pprofSrv.Shutdown(ctx); err != nil {
+				log.Printf("pprof server shutdown failed: %v", err)
+				if closeErr := pprofSrv.Close(); closeErr != nil && !errors.Is(closeErr, http.ErrServerClosed) {
+					log.Printf("pprof server forced close failed: %v", closeErr)
+				}
+			}
+		}
 		if err := srv.Shutdown(ctx); err != nil {
 			log.Printf("graceful shutdown failed: %v", err)
 			if closeErr := srv.Close(); closeErr != nil && !errors.Is(closeErr, http.ErrServerClosed) {
@@ -146,4 +176,49 @@ func hasFlag(flag string) bool {
 		}
 	}
 	return false
+}
+
+func getenvBool(key string, fallback bool) bool {
+	value := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
+	switch value {
+	case "1", "true", "t", "yes", "y", "on":
+		return true
+	case "0", "false", "f", "no", "n", "off":
+		return false
+	}
+	return fallback
+}
+
+func configureMaxProcs(logger *log.Logger) func() {
+	if logger == nil {
+		logger = log.Default()
+	}
+	undo, err := maxprocs.Set(maxprocs.Logger(func(format string, args ...interface{}) {
+		logger.Printf(format, args...)
+	}))
+	if err != nil {
+		logger.Printf("maxprocs configuration skipped: %v", err)
+		return func() {}
+	}
+	return undo
+}
+
+func startProfilingServer(addr string, enableFGProf bool, logger *log.Logger) *http.Server {
+	mux := http.NewServeMux()
+	mux.Handle("/debug/pprof/", http.DefaultServeMux)
+	if enableFGProf {
+		mux.Handle("/debug/fgprof", fgprof.Handler())
+	}
+
+	srv := &http.Server{Addr: addr, Handler: mux}
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Printf("pprof server exited: %v", err)
+		}
+	}()
+	logger.Printf("pprof enabled at http://%s/debug/pprof/", addr)
+	if enableFGProf {
+		logger.Printf("fgprof enabled at http://%s/debug/fgprof", addr)
+	}
+	return srv
 }

@@ -8,7 +8,12 @@ import (
 	"testing"
 
 	"github.com/datafog/datafog-api/internal/shim"
+	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestParseMode(t *testing.T) {
 	t.Run("default", func(t *testing.T) {
@@ -38,9 +43,48 @@ func TestParseMode(t *testing.T) {
 	})
 }
 
+func TestParseBoolOption(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		got, set, err := parseBoolOption("")
+		if err != nil {
+			t.Fatalf("expected parse success, got %v", err)
+		}
+		if set {
+			t.Fatal("expected unset flag for empty value")
+		}
+		if got {
+			t.Fatal("expected false when unset")
+		}
+	})
+	t.Run("true", func(t *testing.T) {
+		got, set, err := parseBoolOption("true")
+		if err != nil {
+			t.Fatalf("expected parse success, got %v", err)
+		}
+		if !set || !got {
+			t.Fatalf("expected parsed true value, got %v (set=%v)", got, set)
+		}
+	})
+	t.Run("false", func(t *testing.T) {
+		got, set, err := parseBoolOption("false")
+		if err != nil {
+			t.Fatalf("expected parse success, got %v", err)
+		}
+		if !set || got {
+			t.Fatalf("expected parsed false value, got %v (set=%v)", got, set)
+		}
+	})
+	t.Run("invalid", func(t *testing.T) {
+		if _, _, err := parseBoolOption("notbool"); err == nil {
+			t.Fatal("expected parse error")
+		}
+	})
+}
+
 func TestResolveRuntimeConfig(t *testing.T) {
 	t.Setenv("DATAFOG_SHIM_POLICY_URL", "http://env:8080")
 	t.Setenv("DATAFOG_SHIM_MODE", string(shim.ModeObserve))
+	t.Setenv("DATAFOG_SHIM_ENFORCE_POLICY_ERRORS", "true")
 
 	cfg, err := resolveRuntimeConfig(shimRuntimeConfig{})
 	if err != nil {
@@ -52,8 +96,32 @@ func TestResolveRuntimeConfig(t *testing.T) {
 	if cfg.mode != string(shim.ModeObserve) {
 		t.Fatalf("expected observe mode, got %q", cfg.mode)
 	}
+	if !cfg.enforcePolicyErrors {
+		t.Fatalf("expected enforce policy errors from env to be true")
+	}
+	if !cfg.enforcePolicyErrorsSet {
+		t.Fatalf("expected enforce-policy-errors set when env value present")
+	}
 	if cfg.shimDir == "" {
 		t.Fatal("expected shim directory fallback")
+	}
+
+	cfg, err = resolveRuntimeConfig(shimRuntimeConfig{policyURL: "http://flag:8080", enforcePolicyErrors: false, enforcePolicyErrorsSet: true})
+	if err != nil {
+		t.Fatalf("expected explicit enforce-policy config to resolve, got %v", err)
+	}
+	if cfg.policyURL != "http://flag:8080" {
+		t.Fatalf("expected CLI policy URL, got %q", cfg.policyURL)
+	}
+	if cfg.enforcePolicyErrors {
+		t.Fatalf("expected explicit enforce policy errors false, got true")
+	}
+}
+
+func TestResolveRuntimeConfigInvalidEnforcePolicyErrors(t *testing.T) {
+	t.Setenv("DATAFOG_SHIM_ENFORCE_POLICY_ERRORS", "not-bool")
+	if _, err := resolveRuntimeConfig(shimRuntimeConfig{}); err == nil {
+		t.Fatal("expected invalid enforce-policy-errors env value to fail")
 	}
 }
 
@@ -106,6 +174,7 @@ func TestBuildShimScript(t *testing.T) {
 		string(shim.ModeObserve),
 		"http://localhost:8080",
 		"/tmp/events.ndjson",
+		true,
 	)
 	if !strings.Contains(script, shimMarker) {
 		t.Fatalf("script missing shim marker")
@@ -116,8 +185,14 @@ func TestBuildShimScript(t *testing.T) {
 	if !strings.Contains(script, "# DATAFOG_SHIM_TARGET=/usr/bin/git") {
 		t.Fatalf("script missing target metadata")
 	}
+	if !strings.Contains(script, "# DATAFOG_SHIM_ENFORCE_POLICY_ERRORS=true") {
+		t.Fatalf("script missing enforce policy errors metadata")
+	}
 	if !strings.Contains(script, `--mode "$SHIM_MODE"`) {
 		t.Fatalf("script missing runtime mode wiring")
+	}
+	if !strings.Contains(script, `--enforce-policy-errors "$SHIM_ENFORCE_POLICY_ERRORS"`) {
+		t.Fatalf("script missing enforce policy errors wiring")
 	}
 }
 
@@ -139,9 +214,11 @@ func TestInstallListAndUninstallShim(t *testing.T) {
 	}
 
 	cfg := shimRuntimeConfig{
-		policyURL: "http://localhost:8080",
-		mode:      string(shim.ModeEnforced),
-		shimDir:   shimDir,
+		policyURL:              "http://localhost:8080",
+		mode:                   string(shim.ModeEnforced),
+		shimDir:                shimDir,
+		enforcePolicyErrors:    true,
+		enforcePolicyErrorsSet: true,
 	}
 
 	shimPath, err := installShimScript(fakeShimBinary, cfg, "git", "git", targetBinary, false)
@@ -166,6 +243,9 @@ func TestInstallListAndUninstallShim(t *testing.T) {
 	if found.Adapter != "vcs" {
 		t.Fatalf("expected adapter vcs, got %q", found.Adapter)
 	}
+	if found.EnforcePolicyErrors != true {
+		t.Fatalf("expected enforce policy errors metadata true, got %v", found.EnforcePolicyErrors)
+	}
 
 	list, err := listManagedShims(shimDir)
 	if err != nil {
@@ -186,6 +266,58 @@ func TestInstallListAndUninstallShim(t *testing.T) {
 
 	if _, statErr := os.Stat(shimPath); !os.IsNotExist(statErr) {
 		t.Fatalf("expected shim removed")
+	}
+}
+
+func TestHooksInstallHonorsEnforcePolicyErrorsOverride(t *testing.T) {
+	root := t.TempDir()
+	shimDir := filepath.Join(root, "shims")
+	targetDir := filepath.Join(root, "targets")
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		t.Fatalf("mkdir targets: %v", err)
+	}
+
+	targetBinary := filepath.Join(targetDir, "git")
+	if err := os.WriteFile(targetBinary, []byte(""), 0o755); err != nil {
+		t.Fatalf("write target binary: %v", err)
+	}
+	fakeShimBinary := filepath.Join(root, "datafog-shim")
+	if err := os.WriteFile(fakeShimBinary, []byte("#!/bin/sh\necho shim\n"), 0o755); err != nil {
+		t.Fatalf("write shim binary: %v", err)
+	}
+
+	baseCfg := shimRuntimeConfig{
+		policyURL:              "http://localhost:8080",
+		mode:                   string(shim.ModeObserve),
+		shimDir:                shimDir,
+		enforcePolicyErrors:    true,
+		enforcePolicyErrorsSet: true,
+	}
+
+	if err := runHooksInstall(baseCfg, []string{
+		"--target",
+		targetBinary,
+		"--enforce-policy-errors",
+		"false",
+		"git",
+	}); err != nil {
+		t.Fatalf("runHooksInstall failed: %v", err)
+	}
+
+	shimPath := shimScriptPath(shimDir, "git")
+	found, managed, err := readShimMetadata(shimPath)
+	if err != nil {
+		t.Fatalf("read metadata: %v", err)
+	}
+	if !managed {
+		t.Fatal("expected managed shim")
+	}
+	if found.EnforcePolicyErrors {
+		t.Fatalf("expected override to disable enforce policy errors, got true")
+	}
+
+	if err := os.Remove(shimPath); err != nil {
+		t.Fatalf("remove shim path: %v", err)
 	}
 }
 

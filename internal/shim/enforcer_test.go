@@ -209,6 +209,30 @@ func TestShellExecutionPolicyErrorPassesInObserveMode(t *testing.T) {
 	}
 }
 
+func TestShellExecutionPolicyErrorBlocksInObserveModeWhenConfigured(t *testing.T) {
+	decider := &fakeDecisionClient{
+		err: errors.New("policy unavailable"),
+	}
+	runner := &fakeCommandRunner{out: []byte("ok\n")}
+	recorder := &fakeEventRecorder{}
+	interceptor := NewGate(decider, WithMode(ModeObserve), WithEnforcePolicyErrors(true), WithEventSink(recorder))
+	interceptor.Runner = runner
+
+	_, _, err := interceptor.ExecuteShell(context.Background(), "ls", nil, "", nil, false)
+	if err == nil {
+		t.Fatalf("expected policy error to block in observe mode when configured")
+	}
+	if runner.called {
+		t.Fatalf("expected command runner to be blocked on policy error")
+	}
+	if len(recorder.events) != 1 || recorder.events[0].Mode != string(ModeObserve) {
+		t.Fatalf("expected one observe-mode event, got %#v", recorder.events)
+	}
+	if recorder.events[0].Allowed != false {
+		t.Fatalf("expected blocked event, got %#v", recorder.events[0])
+	}
+}
+
 func TestCommandAdapterExecution(t *testing.T) {
 	decider := &fakeDecisionClient{
 		response: models.DecideResponse{

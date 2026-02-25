@@ -126,16 +126,22 @@ func ScanNER(text string, entityFilter []string) []models.ScanFinding {
 		return nil
 	}
 
-	requested := map[string]struct{}{}
-	if len(entityFilter) > 0 {
-		for _, name := range entityFilter {
-			requested[strings.ToLower(strings.TrimSpace(name))] = struct{}{}
-		}
+	requested := requestedEntitySet(entityFilter)
+	return scanNERWithFilter(text, requested)
+}
+
+func scanNERWithFilter(text string, requested map[string]struct{}) []models.ScanFinding {
+	if !NEREnabled {
+		return nil
 	}
 
-	wantPerson := len(requested) == 0 || hasKey(requested, "person")
-	wantOrg := len(requested) == 0 || hasKey(requested, "organization")
-	wantLoc := len(requested) == 0 || hasKey(requested, "location")
+	if len(requested) > 0 && !shouldRunNERForFilter(requested) {
+		return nil
+	}
+
+	wantPerson := shouldRunEntity(requested, "person")
+	wantOrg := shouldRunEntity(requested, "organization")
+	wantLoc := shouldRunEntity(requested, "location")
 
 	findings := make([]models.ScanFinding, 0)
 

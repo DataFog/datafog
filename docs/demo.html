@@ -106,7 +106,7 @@ const SCENARIOS = [
   {
     id: 'shell-api-key',
     title: 'Agent leaks API key in shell command',
-    desc: 'An AI agent tries to run a git push, but the text it passes contains an API secret. The shim detects the key and blocks execution.',
+    desc: 'An AI agent tries to run a git push, but the text it passes contains an API secret. The policy gate detects the key and blocks execution.',
     tags: [['deny','deny'], ['entity','api_key']],
     steps: [
       {
@@ -119,7 +119,7 @@ const SCENARIOS = [
       {
         label: 'Step 2',
         title: 'DataFog scans for PII',
-        desc: 'The shim sends the payload to the scan engine before making a policy decision.',
+        desc: 'The policy gate sends the payload to the scan engine before making a policy decision.',
         type: 'scan',
         request: { text: 'Deploying with api_key=SK8xPw2mQ9nR4vT7yBcD3fGh to production' }
       },
@@ -132,8 +132,8 @@ const SCENARIOS = [
       },
       {
         label: 'Step 4',
-        title: 'Shim blocks execution',
-        desc: 'The command never runs. The agent receives a deny response with the matched rule.',
+        title: 'Policy gate blocks execution',
+        desc: 'The command never runs. The policy gate returns a deny response with the matched rule.',
         type: 'exec',
         request: { command: 'git', args: ['push','origin','main'], stdin: 'Deploying with api_key=SK8xPw2mQ9nR4vT7yBcD3fGh to production' }
       }
@@ -142,7 +142,7 @@ const SCENARIOS = [
   {
     id: 'file-write-redact',
     title: 'File write with PII gets redacted',
-    desc: 'An agent writes a log file containing emails and SSNs. The shim detects PII and redacts it before the file hits disk.',
+    desc: 'An agent writes a log file containing emails and SSNs. The policy gate detects PII and redacts it before the file hits disk.',
     tags: [['redact','allow_with_redaction'], ['entity','email'], ['entity','ssn']],
     steps: [
       {
@@ -155,7 +155,7 @@ const SCENARIOS = [
       {
         label: 'Step 2',
         title: 'DataFog scans content',
-        desc: 'Before writing, the shim scans the file content for sensitive entities.',
+        desc: 'Before writing, the policy gate scans the file content for sensitive entities.',
         type: 'scan',
         request: { text: 'Customer: alice@example.com\nSSN: 123-45-6789\nPhone: 555-123-4567\nStatus: Active' }
       },
@@ -169,7 +169,7 @@ const SCENARIOS = [
       {
         label: 'Step 4',
         title: 'File written with redactions',
-        desc: 'The shim writes the file, but PII has been replaced. Compare original vs what hit disk.',
+        desc: 'The policy gate writes the file, but PII has been replaced. Compare original vs what hit disk.',
         type: 'write',
         request: { filename: 'summary.txt', content: 'Customer: alice@example.com\nSSN: 123-45-6789\nPhone: 555-123-4567\nStatus: Active' }
       }
@@ -178,7 +178,7 @@ const SCENARIOS = [
   {
     id: 'safe-command',
     title: 'Clean command passes through',
-    desc: 'An agent runs a safe command with no PII. The shim allows it and returns the output.',
+    desc: 'An agent runs a safe command with no PII. The policy gate allows it and returns the output.',
     tags: [['allow','allow']],
     steps: [
       {
@@ -191,7 +191,7 @@ const SCENARIOS = [
       {
         label: 'Step 2',
         title: 'DataFog scans context',
-        desc: 'The shim scans the command context. No PII found.',
+        desc: 'The policy gate scans the command context. No PII found.',
         type: 'scan',
         request: { text: 'echo Hello from DataFog' }
       },
@@ -214,20 +214,20 @@ const SCENARIOS = [
   {
     id: 'file-read-redact',
     title: 'Reading a file redacts PII in output',
-    desc: 'A file on disk has PII. When the agent reads it through the shim, sensitive values are redacted in the returned content.',
+    desc: 'A file on disk has PII. When the agent reads it through the policy gate, sensitive values are redacted in the returned content.',
     tags: [['redact','allow_with_redaction'], ['entity','email'], ['entity','phone']],
     steps: [
       {
         label: 'Step 1',
         title: 'Seed a file with PII',
-        desc: 'First, we write a raw file to the sandbox (bypassing the shim) so there is PII on disk to read back.',
+        desc: 'First, we write a raw file to the sandbox (bypassing the policy gate) so there is PII on disk to read back.',
         type: 'seed',
         request: { filename: 'contacts.txt', content: 'Bob: bob@corp.io / 415-555-0199\nInternal key: api_key=Abc1234567890123456' }
       },
       {
         label: 'Step 2',
         title: 'Agent requests file read',
-        desc: 'The agent asks the shim to read contacts.txt.',
+        desc: 'The agent asks the policy gate to read contacts.txt.',
         type: 'info',
         display: { filename: 'contacts.txt', action: 'file.read' }
       },
@@ -524,10 +524,10 @@ async function runReadStep(req) {
 }
 
 async function runSeedStep(req) {
-  // Write directly to sandbox, bypassing the shim gate — raw PII lands on disk
+  // Write directly to sandbox, bypassing the policy gate — raw PII lands on disk
   const { data, ms } = await apiCall('POST', '/demo/seed', req);
   if (data.seeded) {
-    return `<div class="step-result"><div style="color:#22c55e;font-size:13px">File <code>${esc(req.filename)}</code> seeded in sandbox <span style="color:#64748b">(bypassed shim — raw PII on disk)</span></div>
+    return `<div class="step-result"><div style="color:#22c55e;font-size:13px">File <code>${esc(req.filename)}</code> seeded in sandbox <span style="color:#64748b">(bypassed policy gate — raw PII on disk)</span></div>
       <pre style="margin-top:6px;background:#0f172a;padding:10px;border-radius:6px;font-size:12px">${esc(req.content)}</pre>
       <div class="meta-row"><span>${ms}ms</span></div></div>`;
   }
