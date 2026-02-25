@@ -887,6 +887,12 @@ func TestMetricsEndpoint(t *testing.T) {
 	if got.ByPath["/_not_found"] != 1 {
 		t.Fatalf("expected /_not_found to be tracked once, got %d", got.ByPath["/_not_found"])
 	}
+	if got.AvgLatencyMs <= 0 {
+		t.Fatalf("expected positive average latency, got %f", got.AvgLatencyMs)
+	}
+	if got.ByPathLatency["/health"] <= 0 {
+		t.Fatalf("expected health average latency to be tracked, got %f", got.ByPathLatency["/health"])
+	}
 	if _, err := time.Parse(time.RFC3339, got.StartedAt); err != nil {
 		t.Fatalf("expected started_at to be RFC3339, got %q", got.StartedAt)
 	}

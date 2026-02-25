@@ -40,9 +40,9 @@ The wrapper process is still named `datafog-shim` for compatibility, but we desc
 
 ## Positioning
 
-- **Developers and agent builders:** DataFog is a **privacy firewall for CLI tools and AI agents**. It sits in your PATH or runtime, inspects what is flowing through your commands, and enforces policy before data-sensitive actions execute.
-- **Security/compliance buyers:** DataFog is runtime policy-as-code enforcement at the process level with receipts for every decision.
-- **Broader view:** DataFog is the **data plane for agent governance** — detect, decide, enforce, and audit—not just “PII redaction.”
+- **Developers and agent builders:** DataFog is a **data-aware policy enforcement layer** for CLI tools and AI agents. It sits in your PATH or runtime, inspects data flowing through commands, and enforces policy before sensitive actions execute.
+- **Security/compliance buyers:** DataFog maps closely to runtime DLP for developer workstations, but without the legacy footprint: policy is programmable (OPA-style), decision-aware, and process-bound.
+- **Broader view:** DataFog is the **data plane for agent governance** — detect, decide, enforce, and audit.
 
 ## Repository layout
 
@@ -373,8 +373,9 @@ spec:
 ## If something fails, check these first
 
 1. `go test ./...` (build/runtime validation before changing policy)
-2. `/health` response for policy id/version mismatch
-3. Environment variables are set and files are writable
-4. API token/header if `DATAFOG_API_TOKEN` is configured
-5. Policy JSON is valid and rules match expected action fields
-6. Optional benchmark sweep: `scripts/run-benchmarks.sh`
+2. `go test -race ./...` (check race conditions on concurrency-sensitive paths)
+3. `/health` response for policy id/version mismatch
+4. Environment variables are set and files are writable
+5. API token/header if `DATAFOG_API_TOKEN` is configured
+6. Policy JSON is valid and rules match expected action fields
+7. Optional benchmark sweep: `scripts/run-benchmarks.sh`

@@ -21,6 +21,8 @@ In-process counters are exposed at `GET /metrics`:
 - `by_status`
 - `by_path`
 - `by_method`
+- `avg_latency_ms`
+- `by_path_avg_latency_ms`
 - `uptime_seconds`
 - `started_at`
 

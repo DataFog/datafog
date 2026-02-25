@@ -59,3 +59,15 @@ jobs:
         with:
           name: benchmark-results
           path: /tmp/bench/benchmark.txt
+
+  race:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.13"
+      - name: Run race detector
+        run: go test -race ./...
