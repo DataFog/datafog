@@ -11,6 +11,7 @@ import (
 
 	"github.com/datafog/datafog-api/internal/models"
 	"github.com/datafog/datafog-api/internal/receipts"
+	"github.com/datafog/datafog-api/internal/shim"
 )
 
 func testPolicy() models.Policy {
@@ -42,6 +43,30 @@ func makeServerWithTokenAndRateLimit(t *testing.T, apiToken string, rateLimitRPS
 	}
 	h := New(testPolicy(), store, nil, apiToken, rateLimitRPS)
 	return &http.Server{Handler: h.Handler()}
+}
+
+type fakeEventReader struct {
+	events []shim.DecisionEvent
+}
+
+func (r fakeEventReader) Query(q shim.EventQuery) ([]shim.DecisionEvent, error) {
+	if q.Limit <= 0 {
+		q.Limit = 1000
+	}
+	filtered := make([]shim.DecisionEvent, 0, len(r.events))
+	for _, event := range r.events {
+		if q.Adapter != "" && event.Tool != q.Adapter {
+			continue
+		}
+		if q.Decision != "" && string(event.Decision) != q.Decision {
+			continue
+		}
+		filtered = append(filtered, event)
+		if len(filtered) >= q.Limit {
+			break
+		}
+	}
+	return filtered, nil
 }
 
 func TestHealthEndpoint(t *testing.T) {
@@ -907,6 +932,38 @@ func TestMetricsMethodNotAllowed(t *testing.T) {
 	resp := httptest.NewRecorder()
 	server.Handler.ServeHTTP(resp, req)
 	assertJSONError(t, resp, http.StatusMethodNotAllowed, "method_not_allowed")
+}
+
+func TestEventsAdapterFilterCanonicalized(t *testing.T) {
+	s, err := receipts.NewReceiptStore(t.TempDir() + "/receipts.jsonl")
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	h := New(testPolicy(), s, nil, "", 0)
+	h.SetEventReader(fakeEventReader{events: []shim.DecisionEvent{
+		{Tool: "claude", Decision: string(models.DecisionAllow)},
+		{Tool: "vcs", Decision: string(models.DecisionDeny)},
+	}})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/events?adapter=CLAUDE", nil)
+	resp := httptest.NewRecorder()
+	h.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+	var got struct {
+		Events []shim.DecisionEvent `json:"events"`
+		Total  int                  `json:"total"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if got.Total != 1 {
+		t.Fatalf("expected one canonicalized adapter match, got %d", got.Total)
+	}
+	if len(got.Events) != 1 || got.Events[0].Tool != "claude" {
+		t.Fatalf("expected canonicalized filter to match claude, got %#v", got.Events)
+	}
 }
 
 func TestInvalidJSONHandling(t *testing.T) {

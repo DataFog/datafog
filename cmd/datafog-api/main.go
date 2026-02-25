@@ -33,7 +33,7 @@ func main() {
 	rateLimitRPS := getenvInt("DATAFOG_RATE_LIMIT_RPS", 0)
 	shutdownTimeout := getenvDuration("DATAFOG_SHUTDOWN_TIMEOUT", 10*time.Second)
 	enableDemo := getenv("DATAFOG_ENABLE_DEMO", "") != "" || hasFlag("--enable-demo")
-	eventsPath := getenv("DATAFOG_EVENTS_PATH", "datafog_events.ndjson")
+	eventsPath := getenv("DATAFOG_EVENTS_PATH", "")
 	pprofAddr := getenv("DATAFOG_PPROF_ADDR", "")
 	fgprofEnabled := getenvBool("DATAFOG_FGPROF", false)
 
@@ -47,10 +47,18 @@ func main() {
 		log.Fatalf("init receipts: %v", err)
 	}
 
-	eventSink := shim.NewNDJSONDecisionEventSink(eventsPath)
+	var eventSink shim.DecisionEventSink
+	var eventReader shim.EventReader
+	if eventsPath != "" {
+		eventStore := shim.NewNDJSONDecisionEventSink(eventsPath)
+		eventSink = eventStore
+		eventReader = eventStore
+	}
 
 	h := server.New(policyData, store, log.Default(), apiToken, rateLimitRPS)
-	h.SetEventReader(eventSink)
+	if eventReader != nil {
+		h.SetEventReader(eventReader)
+	}
 
 	var handler http.Handler
 	if enableDemo {

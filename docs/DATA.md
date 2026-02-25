@@ -33,7 +33,9 @@ No schema migration framework exists currently; backfills are manual and should 
 
 - Receipt IDs and action/input hashes must remain consistent for auditability.
 - Receipt reads/writes are append-only (`Save` appends a JSON line and fsyncs).
-- On startup, the service loads existing receipts into memory; duplicate IDs are naturally coalesced by key in-memory map.
+- On startup, valid existing receipts are loaded into memory and duplicate receipt IDs are coalesced by key in the in-memory map.
+- Malformed existing receipt lines are skipped so the service can continue if one line is corrupted.
+- Idempotency replay caches are in-memory and are not persisted across restarts.
 - Policy validation runs at startup and rejects invalid schemas before serving traffic.
 
 ## Sensitive Data Notes

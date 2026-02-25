@@ -103,16 +103,23 @@ Returns coarse-grained service telemetry for operations and routing.
     "/v1/decide": 3,
     "/_not_found": 3
   },
+  "by_path_avg_latency_ms": {
+    "/health": 12.5,
+    "/v1/scan": 18.2,
+    "/v1/decide": 22.8,
+    "/_not_found": 0.9
+  },
   "by_method": {
     "GET": 14,
     "POST": 28
   },
+  "avg_latency_ms": 11.2,
   "started_at": "RFC3339 timestamp",
   "uptime_seconds": 12.34
 }
 ```
 
-`by_status`, `by_path`, and `by_method` include counters for completed requests observed before each `/metrics` call. `/metrics` request details appear on subsequent polling.
+`by_status`, `by_path`, `by_method`, `avg_latency_ms`, and `by_path_avg_latency_ms` include metrics for completed requests observed before each `/metrics` call. `/metrics` request details appear on subsequent polling; latency fields are reported in milliseconds.
 
 ### `POST /v1/scan`
 
@@ -340,7 +347,7 @@ Query params:
 - `after` (RFC3339 timestamp)
 - `before` (RFC3339 timestamp)
 - `decision` (`allow|transform|allow_with_redaction|deny`)
-- `adapter` (tool/adapter filter, e.g. `claude`, `codex`)
+- `adapter` (tool/adapter filter, case-insensitive; `vcs` and `claude` are canonicalized forms)
 
 ```json
 {
@@ -375,6 +382,7 @@ If no events are configured or none match, return `{"events":[],"total":0}`.
 - Supported endpoints: `POST /v1/scan`, `POST /v1/decide`, `POST /v1/transform`, `POST /v1/anonymize`.
 - Replaying the same idempotency key and identical semantic payload returns the same status and body.
 - Reusing a key with different payloads returns `409` and `code: idempotency_conflict`.
+- Idempotency keys are stored in server memory; restarting the API process clears request deduplication history.
 
 ## Optional demo endpoints (if enabled)
 
@@ -388,3 +396,5 @@ The following routes are only available when the server is started with `DATAFOG
 - `GET /demo/sandbox`
 
 These return JSON payloads for execution and file operations and are intended for documentation/demo purposes only.
+
+- `POST /demo/seed` is a documentation helper route that bypasses policy enforcement and should not be used for production workflows.

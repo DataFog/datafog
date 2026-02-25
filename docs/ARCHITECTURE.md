@@ -31,7 +31,7 @@ For enforcement: CLI/tool action → `datafog-shim` policy gate → `POST /v1/de
 - `/health` and `/v1/policy/version` do not mutate state.
 - No secrets are logged or returned in API responses.
 - Decision side effects are request-scoped and serialized into receipts before returning a `decide` response.
-- If a request includes idempotency keys, repeated requests must return identical status/body or a conflict error.
+- If a request includes idempotency keys, repeated requests must return identical status/body or a conflict error within a live process; idempotency caches are in-memory and clear on restart.
 - Unsupported or unauthenticated requests fail closed (`401`, `4xx`, or `405`) before any enforcement action.
 
 ## Details Live Elsewhere

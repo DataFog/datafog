@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/datafog/datafog-api/internal/shim"
@@ -22,21 +23,24 @@ const (
 )
 
 type shimRuntimeConfig struct {
-	policyURL string
-	apiToken  string
-	mode      string
-	eventSink string
-	shimDir   string
-	sensitive bool
+	policyURL              string
+	apiToken               string
+	mode                   string
+	eventSink              string
+	shimDir                string
+	sensitive              bool
+	enforcePolicyErrors    bool
+	enforcePolicyErrorsSet bool
 }
 
 type managedShimMetadata struct {
-	Command   string
-	Adapter   string
-	Target    string
-	Mode      string
-	PolicyURL string
-	EventSink string
+	Command             string
+	Adapter             string
+	Target              string
+	Mode                string
+	PolicyURL           string
+	EventSink           string
+	EnforcePolicyErrors bool
 }
 
 func main() {
@@ -50,6 +54,7 @@ func run(argv []string) error {
 	flags := flag.NewFlagSet("datafog-shim", flag.ContinueOnError)
 	policyURL := flags.String("policy-url", "", "base URL for datafog API (for example http://localhost:8080)")
 	apiToken := flags.String("api-token", "", "API token for policy decisions")
+	enforcePolicyErrors := flags.String("enforce-policy-errors", "", "set to true to block command execution when policy service check fails")
 	mode := flags.String("mode", "", "enforcement mode: enforced|observe")
 	eventSink := flags.String("event-sink", "", "path for NDJSON decision event sink")
 	shimDir := flags.String("shim-dir", "", "directory for installed adapter shims")
@@ -58,13 +63,20 @@ func run(argv []string) error {
 		return err
 	}
 
+	enforcePolicyErrorsValue, enforcePolicyErrorsSet, err := parseBoolOption(*enforcePolicyErrors)
+	if err != nil {
+		return err
+	}
+
 	cfg, err := resolveRuntimeConfig(shimRuntimeConfig{
-		policyURL: *policyURL,
-		apiToken:  *apiToken,
-		mode:      *mode,
-		eventSink: *eventSink,
-		shimDir:   *shimDir,
-		sensitive: *sensitive,
+		policyURL:              *policyURL,
+		apiToken:               *apiToken,
+		mode:                   *mode,
+		eventSink:              *eventSink,
+		shimDir:                *shimDir,
+		sensitive:              *sensitive,
+		enforcePolicyErrors:    enforcePolicyErrorsValue,
+		enforcePolicyErrorsSet: enforcePolicyErrorsSet,
 	})
 	if err != nil {
 		return err
@@ -96,13 +108,32 @@ func run(argv []string) error {
 }
 
 func resolveRuntimeConfig(input shimRuntimeConfig) (shimRuntimeConfig, error) {
+	enforcePolicyErrors := false
+	enforcePolicyErrorsSet := false
+	if input.enforcePolicyErrorsSet {
+		enforcePolicyErrors = input.enforcePolicyErrors
+		enforcePolicyErrorsSet = true
+	} else {
+		envRaw := strings.TrimSpace(os.Getenv("DATAFOG_SHIM_ENFORCE_POLICY_ERRORS"))
+		if envRaw != "" {
+			parsed, err := parseBoolValue(envRaw)
+			if err != nil {
+				return shimRuntimeConfig{}, err
+			}
+			enforcePolicyErrors = parsed
+			enforcePolicyErrorsSet = true
+		}
+	}
+
 	cfg := shimRuntimeConfig{
-		policyURL: coalesce(input.policyURL, os.Getenv("DATAFOG_SHIM_POLICY_URL"), defaultPolicyURL),
-		apiToken:  coalesce(input.apiToken, os.Getenv("DATAFOG_SHIM_API_TOKEN")),
-		mode:      coalesce(input.mode, os.Getenv("DATAFOG_SHIM_MODE"), string(shim.ModeEnforced)),
-		eventSink: coalesce(input.eventSink, os.Getenv("DATAFOG_SHIM_EVENT_SINK")),
-		shimDir:   coalesce(input.shimDir, os.Getenv("DATAFOG_SHIM_DIR"), defaultShimDir()),
-		sensitive: input.sensitive,
+		policyURL:              coalesce(input.policyURL, os.Getenv("DATAFOG_SHIM_POLICY_URL"), defaultPolicyURL),
+		apiToken:               coalesce(input.apiToken, os.Getenv("DATAFOG_SHIM_API_TOKEN")),
+		mode:                   coalesce(input.mode, os.Getenv("DATAFOG_SHIM_MODE"), string(shim.ModeEnforced)),
+		eventSink:              coalesce(input.eventSink, os.Getenv("DATAFOG_SHIM_EVENT_SINK")),
+		shimDir:                coalesce(input.shimDir, os.Getenv("DATAFOG_SHIM_DIR"), defaultShimDir()),
+		sensitive:              input.sensitive,
+		enforcePolicyErrors:    enforcePolicyErrors,
+		enforcePolicyErrorsSet: enforcePolicyErrorsSet,
 	}
 
 	parsedMode, err := parseMode(cfg.mode)
@@ -124,6 +155,25 @@ func parseMode(raw string) (shim.EnforcementMode, error) {
 	}
 }
 
+func parseBoolValue(raw string) (bool, error) {
+	parsed, err := strconv.ParseBool(strings.TrimSpace(raw))
+	if err != nil {
+		return false, fmt.Errorf("invalid boolean value %q", raw)
+	}
+	return parsed, nil
+}
+
+func parseBoolOption(raw string) (bool, bool, error) {
+	if strings.TrimSpace(raw) == "" {
+		return false, false, nil
+	}
+	value, err := parseBoolValue(raw)
+	if err != nil {
+		return false, false, err
+	}
+	return value, true, nil
+}
+
 func coalesce(values ...string) string {
 	for _, value := range values {
 		if strings.TrimSpace(value) != "" {
@@ -141,6 +191,7 @@ func newGate(cfg shimRuntimeConfig) *shim.Gate {
 	}
 	opts := []shim.GateOption{
 		shim.WithMode(mode),
+		shim.WithEnforcePolicyErrors(cfg.enforcePolicyErrors),
 	}
 	if strings.TrimSpace(cfg.eventSink) != "" {
 		opts = append(opts, shim.WithEventSink(shim.NewNDJSONDecisionEventSink(cfg.eventSink)))
@@ -214,6 +265,7 @@ func runCommandAdapter(ctx context.Context, cfg shimRuntimeConfig, args []string
 	adapter := flags.String("adapter", "", "tool adapter name")
 	target := flags.String("target", "", "binary or command to execute")
 	overrideMode := flags.String("mode", "", "enforcement mode: enforced|observe")
+	overrideEnforcePolicyErrors := flags.String("enforce-policy-errors", "", "set to true to block command execution when policy service fails")
 	policyURL := flags.String("policy-url", "", "base URL for datafog API (for example http://localhost:8080)")
 	apiToken := flags.String("api-token", "", "API token for policy decisions")
 	eventSink := flags.String("event-sink", "", "path for NDJSON decision event sink")
@@ -222,15 +274,27 @@ func runCommandAdapter(ctx context.Context, cfg shimRuntimeConfig, args []string
 		return err
 	}
 
-	var err error
-	cfg, err = resolveRuntimeConfig(shimRuntimeConfig{
-		policyURL: coalesce(*policyURL, cfg.policyURL),
-		apiToken:  coalesce(*apiToken, cfg.apiToken),
-		mode:      coalesce(*overrideMode, cfg.mode),
-		eventSink: coalesce(*eventSink, cfg.eventSink),
-		shimDir:   cfg.shimDir,
-		sensitive: *sensitive || cfg.sensitive,
-	})
+	overrideEnforcePolicyErrorsValue, overrideEnforcePolicyErrorsSet, err := parseBoolOption(*overrideEnforcePolicyErrors)
+	if err != nil {
+		return err
+	}
+
+	resolveCfg := shimRuntimeConfig{
+		policyURL:              coalesce(*policyURL, cfg.policyURL),
+		apiToken:               coalesce(*apiToken, cfg.apiToken),
+		mode:                   coalesce(*overrideMode, cfg.mode),
+		eventSink:              coalesce(*eventSink, cfg.eventSink),
+		shimDir:                cfg.shimDir,
+		sensitive:              *sensitive || cfg.sensitive,
+		enforcePolicyErrors:    cfg.enforcePolicyErrors,
+		enforcePolicyErrorsSet: cfg.enforcePolicyErrorsSet,
+	}
+	if overrideEnforcePolicyErrorsSet {
+		resolveCfg.enforcePolicyErrors = overrideEnforcePolicyErrorsValue
+		resolveCfg.enforcePolicyErrorsSet = true
+	}
+
+	cfg, err = resolveRuntimeConfig(resolveCfg)
 	if err != nil {
 		return err
 	}
@@ -293,8 +357,14 @@ func runHooksInstall(cfg shimRuntimeConfig, argv []string) error {
 	overrideMode := flags.String("mode", "", "override enforcement mode for this shim")
 	overridePolicyURL := flags.String("policy-url", "", "override policy URL for this shim")
 	overrideEventSink := flags.String("event-sink", "", "override event sink path for this shim")
+	overrideEnforcePolicyErrors := flags.String("enforce-policy-errors", "", "set to true to block command execution when policy service fails")
 	shimDir := flags.String("shim-dir", "", "directory for generated shim")
 	if err := flags.Parse(argv); err != nil {
+		return err
+	}
+
+	overrideEnforcePolicyErrorsValue, overrideEnforcePolicyErrorsSet, err := parseBoolOption(*overrideEnforcePolicyErrors)
+	if err != nil {
 		return err
 	}
 
@@ -307,6 +377,10 @@ func runHooksInstall(cfg shimRuntimeConfig, argv []string) error {
 	installCfg.mode = coalesce(*overrideMode, cfg.mode)
 	installCfg.policyURL = coalesce(*overridePolicyURL, cfg.policyURL)
 	installCfg.eventSink = coalesce(*overrideEventSink, cfg.eventSink)
+	if overrideEnforcePolicyErrorsSet {
+		installCfg.enforcePolicyErrors = overrideEnforcePolicyErrorsValue
+		installCfg.enforcePolicyErrorsSet = true
+	}
 	if *shimDir != "" {
 		installCfg.shimDir = *shimDir
 	}
@@ -502,6 +576,7 @@ func installShimScript(shimBinary string, cfg shimRuntimeConfig, command, adapte
 		string(mode),
 		cfg.policyURL,
 		cfg.eventSink,
+		cfg.enforcePolicyErrors,
 	)
 
 	if err := os.WriteFile(shimPath, []byte(content), 0o755); err != nil {
@@ -586,6 +661,10 @@ func readShimMetadata(path string) (managedShimMetadata, bool, error) {
 			meta.PolicyURL = val
 		case "EVENT_SINK":
 			meta.EventSink = val
+		case "ENFORCE_POLICY_ERRORS":
+			if parsed, _, err := parseBoolOption(val); err == nil {
+				meta.EnforcePolicyErrors = parsed
+			}
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -594,7 +673,7 @@ func readShimMetadata(path string) (managedShimMetadata, bool, error) {
 	return meta, isManaged, nil
 }
 
-func buildShimScript(shimBinary, command, adapter, target, mode, policyURL, eventSink string) string {
+func buildShimScript(shimBinary, command, adapter, target, mode, policyURL, eventSink string, enforcePolicyErrors bool) string {
 	lines := []string{
 		"#!/bin/sh",
 		"set -eu",
@@ -605,11 +684,13 @@ func buildShimScript(shimBinary, command, adapter, target, mode, policyURL, even
 		"# DATAFOG_SHIM_MODE=" + mode,
 		"# DATAFOG_SHIM_POLICY_URL=" + policyURL,
 		"# DATAFOG_SHIM_EVENT_SINK=" + eventSink,
+		"# DATAFOG_SHIM_ENFORCE_POLICY_ERRORS=" + strconv.FormatBool(enforcePolicyErrors),
 		"",
 		"SHIM_BINARY=" + shQuote(shimBinary),
 		"SHIM_MODE=" + shQuote(mode),
 		"SHIM_POLICY_URL=" + shQuote(policyURL),
 		"SHIM_EVENT_SINK=" + shQuote(eventSink),
+		"SHIM_ENFORCE_POLICY_ERRORS=" + shQuote(strconv.FormatBool(enforcePolicyErrors)),
 		"if [ -n \"${DATAFOG_SHIM_MODE:-}\" ]; then",
 		"  SHIM_MODE=\"$DATAFOG_SHIM_MODE\"",
 		"fi",
@@ -619,6 +700,9 @@ func buildShimScript(shimBinary, command, adapter, target, mode, policyURL, even
 		"if [ -n \"${DATAFOG_SHIM_EVENT_SINK:-}\" ]; then",
 		"  SHIM_EVENT_SINK=\"$DATAFOG_SHIM_EVENT_SINK\"",
 		"fi",
+		"if [ -n \"${DATAFOG_SHIM_ENFORCE_POLICY_ERRORS:-}\" ]; then",
+		"  SHIM_ENFORCE_POLICY_ERRORS=\"$DATAFOG_SHIM_ENFORCE_POLICY_ERRORS\"",
+		"fi",
 		"",
 		`exec "$SHIM_BINARY" run \`,
 		`  --adapter "` + shellEscape(adapter) + `" \`,
@@ -626,6 +710,7 @@ func buildShimScript(shimBinary, command, adapter, target, mode, policyURL, even
 		`  --mode "$SHIM_MODE" \`,
 		`  --policy-url "$SHIM_POLICY_URL" \`,
 		`  --event-sink "$SHIM_EVENT_SINK" \`,
+		`  --enforce-policy-errors "$SHIM_ENFORCE_POLICY_ERRORS" \`,
 		`  --api-token "${DATAFOG_SHIM_API_TOKEN:-}" \`,
 		`  -- \`,
 		`  "$@"`,

@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/datafog/datafog-api/internal/adapters"
 	"github.com/datafog/datafog-api/internal/models"
 	"github.com/datafog/datafog-api/internal/policy"
 	"github.com/datafog/datafog-api/internal/receipts"
@@ -707,8 +708,12 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	if decision := r.URL.Query().Get("decision"); decision != "" {
 		q.Decision = decision
 	}
-	if adapter := r.URL.Query().Get("adapter"); adapter != "" {
-		q.Adapter = adapter
+	if adapter := strings.TrimSpace(r.URL.Query().Get("adapter")); adapter != "" {
+		if canonical, ok := adapters.Canonical(strings.ToLower(adapter)); ok {
+			q.Adapter = canonical
+		} else {
+			q.Adapter = strings.ToLower(adapter)
+		}
 	}
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
 		if n, err := strconv.Atoi(limitStr); err == nil && n > 0 && n <= 1000 {

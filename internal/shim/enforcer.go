@@ -50,23 +50,31 @@ func WithEventSink(sink DecisionEventSink) GateOption {
 	}
 }
 
+func WithEnforcePolicyErrors(enabled bool) GateOption {
+	return func(g *Gate) {
+		g.EnforcePolicyErrors = enabled
+	}
+}
+
 type Gate struct {
-	Client    DecisionClient
-	Runner    CommandRunner
-	Reader    FileReader
-	Writer    FileWriter
-	Mode      EnforcementMode
-	EventSink DecisionEventSink
+	Client              DecisionClient
+	Runner              CommandRunner
+	Reader              FileReader
+	Writer              FileWriter
+	Mode                EnforcementMode
+	EventSink           DecisionEventSink
+	EnforcePolicyErrors bool
 }
 
 func NewGate(client DecisionClient, opts ...GateOption) *Gate {
 	g := &Gate{
-		Client:    client,
-		Runner:    &osCommandRunner{},
-		Reader:    &osFileReader{},
-		Writer:    &osFileWriter{},
-		Mode:      ModeEnforced,
-		EventSink: noopEventSink{},
+		Client:              client,
+		Runner:              &osCommandRunner{},
+		Reader:              &osFileReader{},
+		Writer:              &osFileWriter{},
+		Mode:                ModeEnforced,
+		EventSink:           noopEventSink{},
+		EnforcePolicyErrors: false,
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -139,10 +147,14 @@ func (r *Gate) shouldAllow(decision models.Decision) bool {
 	return r.Mode == ModeObserve
 }
 
+func (r *Gate) shouldBlockOnPolicyError() bool {
+	return r.Mode == ModeEnforced || r.EnforcePolicyErrors
+}
+
 func (r *Gate) executeRequest(ctx context.Context, req models.DecideRequest, run func(context.Context) ([]byte, error)) (models.DecideResponse, []byte, error) {
 	result, err := r.Check(ctx, req)
 	if err != nil {
-		if r.Mode == ModeEnforced {
+		if r.shouldBlockOnPolicyError() {
 			r.recordDecisionEvent(req, result, false, err)
 			return result, nil, err
 		}
@@ -231,7 +243,7 @@ func (r *Gate) WriteFile(ctx context.Context, path string, data []byte, perm fs.
 	req := r.readRequest(action, text, findings)
 	result, err := r.Check(ctx, req)
 	if err != nil {
-		if r.Mode == ModeEnforced {
+		if r.shouldBlockOnPolicyError() {
 			r.recordDecisionEvent(req, result, false, err)
 			return result, err
 		}

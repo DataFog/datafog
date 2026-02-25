@@ -239,6 +239,7 @@ Common env vars for the policy gate:
 - `DATAFOG_SHIM_API_TOKEN` (required if API token is enabled)
 - `DATAFOG_SHIM_MODE` (`enforced` or `observe`)
 - `DATAFOG_SHIM_EVENT_SINK` (optional NDJSON sink)
+- `DATAFOG_SHIM_ENFORCE_POLICY_ERRORS` (`true` to block on policy service errors even in observe mode)
 
 When using `enforced` mode, a blocked action exits non-zero.
 In `observe` mode, it logs decisions but allows execution to continue.
