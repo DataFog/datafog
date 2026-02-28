@@ -131,7 +131,7 @@ func ValidatePolicy(policy models.Policy) error {
 	if len(errors) == 0 {
 		return nil
 	}
-	return fmt.Errorf(strings.Join(errors, "; "))
+	return fmt.Errorf("%s", strings.Join(errors, "; "))
 }
 
 var allowedModes = map[models.TransformMode]struct{}{
@@ -164,6 +164,58 @@ func Evaluate(policy models.Policy, ctx DecisionContext) DecisionResult {
 
 // EvaluateSorted evaluates policy decisions assuming rules are already sorted
 // by priority descending.
+type PolicyIndex struct {
+	byAction map[string][]models.Rule
+}
+
+// BuildPolicyIndex precomputes policy lookup tables for faster action-based filtering.
+// Policy rules are expected to already be in evaluation order.
+func BuildPolicyIndex(policy models.Policy) *PolicyIndex {
+	index := &PolicyIndex{byAction: make(map[string][]models.Rule, len(policy.Rules))}
+	for _, rule := range policy.Rules {
+		if len(rule.Match.ActionTypes) == 0 {
+			index.byAction["*"] = append(index.byAction["*"], rule)
+			continue
+		}
+		for _, actionType := range rule.Match.ActionTypes {
+			normalized := strings.ToLower(strings.TrimSpace(actionType))
+			if normalized == "" {
+				continue
+			}
+			index.byAction[normalized] = append(index.byAction[normalized], rule)
+		}
+	}
+	return index
+}
+
+func (idx *PolicyIndex) rulesForAction(actionType string) []models.Rule {
+	if idx == nil {
+		return nil
+	}
+
+	normalizedActionType := strings.ToLower(strings.TrimSpace(actionType))
+	actionRules := idx.byAction[normalizedActionType]
+	wildcard := idx.byAction["*"]
+	matched := make([]models.Rule, 0, len(actionRules)+len(wildcard))
+	matched = append(matched, actionRules...)
+	matched = append(matched, wildcard...)
+
+	if len(matched) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(matched))
+	ordered := make([]models.Rule, 0, len(matched))
+	for _, rule := range matched {
+		if _, ok := seen[rule.ID]; ok {
+			continue
+		}
+		seen[rule.ID] = struct{}{}
+		ordered = append(ordered, rule)
+	}
+	return ordered
+}
+
 type DecisionContext struct {
 	Action   models.ActionMeta
 	Findings []models.ScanFinding
@@ -177,6 +229,11 @@ type DecisionResult struct {
 }
 
 func EvaluateSorted(policy models.Policy, ctx DecisionContext) DecisionResult {
+	return EvaluateWithIndex(policy, nil, ctx)
+}
+
+// EvaluateWithIndex is the hot-path implementation that can use a precomputed policy index.
+func EvaluateWithIndex(policy models.Policy, index *PolicyIndex, ctx DecisionContext) DecisionResult {
 	if ctx.Action.Type == "" {
 		return DecisionResult{
 			Decision: models.DecisionDeny,
@@ -192,6 +249,9 @@ func EvaluateSorted(policy models.Policy, ctx DecisionContext) DecisionResult {
 	}
 
 	rules := policy.Rules
+	if index != nil {
+		rules = index.rulesForAction(ctx.Action.Type)
+	}
 
 	hasFindings := map[string]struct{}{}
 	for _, f := range ctx.Findings {

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DataFog Admin</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --panel2: #334155;
+      --line: #475569;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --green: #16a34a;
+      --blue: #2563eb;
+      --red: #b91c1c;
+      --amber: #ca8a04;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+    }
+    h1 { margin: 0 0 6px; }
+    h2 { margin: 0 0 10px; font-size: 18px; }
+    .subtle { color: var(--muted); font-size: 12px; }
+    label { display: block; font-size: 12px; margin-bottom: 4px; color: var(--muted); }
+    input, textarea, select, button {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+    button {
+      background: var(--blue);
+      border-color: #1d4ed8;
+      cursor: pointer;
+    }
+    button.secondary { background: #0f172a; }
+    pre {
+      margin: 8px 0 0;
+      white-space: pre-wrap;
+      word-break: break-all;
+      background: #0f172a;
+      border: 1px solid var(--line);
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      max-height: 260px;
+      overflow: auto;
+    }
+    .row { display: flex; gap: 8px; }
+    .chip {
+      display: inline-block;
+      border-radius: 999px;
+      border: 1px solid #1f2937;
+      padding: 2px 8px;
+      font-size: 11px;
+      color: #cbd5e1;
+      margin-right: 6px;
+      margin-bottom: 6px;
+    }
+    .status {
+      display: inline-block;
+      width: 8px; height: 8px; border-radius: 999px;
+      background: var(--amber);
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+  <h1><span class="chip">DataFog</span> Admin</h1>
+  <p class="subtle">Read-only operational dashboard for inspecting decisions and running policy checks.</p>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Connection</h2>
+      <div style="display:flex; align-items:center; justify-content: space-between;">
+        <div><span class="status" id="healthDot"></span><span id="healthText">Unknown</span></div>
+        <button class="secondary" id="refreshBtn">Refresh</button>
+      </div>
+      <label for="apiToken">Auth token (optional)</label>
+      <input id="apiToken" placeholder="Set once per browser session" />
+      <div class="row">
+        <button id="saveToken">Save token</button>
+        <button id="clearToken" class="secondary">Clear token</button>
+      </div>
+      <p class="subtle">Token stored only in browser localStorage for this page.</p>
+      <div id="policyMeta"></div>
+    </div>
+
+    <div class="card">
+      <h2>Service Metrics Snapshot</h2>
+      <pre id="metricsOut">Loading...</pre>
+    </div>
+
+    <div class="card">
+      <h2>Scan / Decide</h2>
+      <label>Text</label>
+      <textarea id="scanText" rows="5" placeholder='api_key=abc text to scan'>api_key=sk_test_1234567890</textarea>
+      <button id="scanBtn">Run /v1/scan</button>
+      <label>Action Type</label>
+      <input id="actionType" value="shell.exec" />
+      <label>Action Resource</label>
+      <input id="actionResource" value="echo" />
+      <button id="decideBtn">Run /v1/decide</button>
+      <pre id="scanDecideOut">No payload yet.</pre>
+    </div>
+
+    <div class="card">
+      <h2>Receipt lookup</h2>
+      <label>Receipt ID</label>
+      <div class="row">
+        <input id="receiptID" placeholder="receipt id" />
+      </div>
+      <button id="receiptBtn">Load receipt</button>
+      <pre id="receiptOut">No payload yet.</pre>
+    </div>
+
+    <div class="card">
+      <h2>Recent Events</h2>
+      <div class="row">
+        <select id="eventDecision">
+          <option value="">all decisions</option>
+          <option>allow</option>
+          <option>transform</option>
+          <option>allow_with_redaction</option>
+          <option>deny</option>
+        </select>
+        <input id="eventLimit" type="number" value="10" min="1" max="1000" />
+      </div>
+      <button id="eventsBtn">Load events</button>
+      <pre id="eventsOut">No payload yet.</pre>
+    </div>
+
+    <div class="card">
+      <h2>Recent Receipts</h2>
+      <div class="row">
+        <input id="receiptLimit" type="number" value="10" min="1" max="1000" />
+        <select id="receiptDecision">
+          <option value="">all decisions</option>
+          <option>allow</option>
+          <option>transform</option>
+          <option>allow_with_redaction</option>
+          <option>deny</option>
+        </select>
+      </div>
+      <button id="receiptsBtn">Load receipts</button>
+      <pre id="receiptsOut">No payload yet.</pre>
+    </div>
+  </div>
+
+<script>
+const API = window.location.origin;
+
+function getToken() {
+  const tokenFromStorage = localStorage.getItem('datafogAdminToken') || '';
+  const input = document.getElementById('apiToken');
+  if (tokenFromStorage && !input.value) {
+    input.value = tokenFromStorage;
+  }
+  return input.value.trim();
+}
+
+function authHeaders() {
+  const token = getToken();
+  if (!token) return {};
+  return {
+    Authorization: `Bearer ${token}`,
+  };
+}
+
+async function callApi(path, opts = {}) {
+  const init = {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(opts.headers || {}),
+      ...authHeaders(),
+    },
+  };
+  const response = await fetch(API + path, {
+    ...init,
+    ...opts,
+  });
+  const text = await response.text();
+  let body = text;
+  try {
+    body = JSON.parse(text);
+  } catch (err) {
+    // keep as raw text
+  }
+  return {status: response.status, body};
+}
+
+function renderErrorMessage(node, error, fallback) {
+  if (error && error.code) {
+    node.textContent = `${error.code}: ${error.message}`;
+    return;
+  }
+  node.textContent = fallback;
+}
+
+async function refreshOverview() {
+  const healthDot = document.getElementById('healthDot');
+  const healthText = document.getElementById('healthText');
+  try {
+    const health = await callApi('/health');
+    if (health.status === 200) {
+      healthDot.style.background = 'var(--green)';
+      healthText.textContent = `Healthy — policy ${health.body.policy_id || 'n/a'} (${health.body.policy_version || 'n/a'})`;
+      const meta = document.getElementById('policyMeta');
+      meta.innerHTML = `<div class="subtle">Started at: ${health.body.started_at || 'n/a'}</div>`;
+    } else {
+      healthDot.style.background = 'var(--red)';
+      healthText.textContent = `Unhealthy (${health.status})`;
+    }
+  } catch (err) {
+    healthDot.style.background = 'var(--red)';
+    healthText.textContent = 'Offline';
+  }
+
+  try {
+    const metrics = await callApi('/metrics');
+    document.getElementById('metricsOut').textContent = JSON.stringify(metrics.body, null, 2);
+  } catch (err) {
+    document.getElementById('metricsOut').textContent = 'Failed to load metrics.';
+  }
+}
+
+function bindActions() {
+  document.getElementById('refreshBtn').onclick = refreshOverview;
+
+  document.getElementById('saveToken').onclick = () => {
+    localStorage.setItem('datafogAdminToken', document.getElementById('apiToken').value.trim());
+    refreshOverview();
+  };
+  document.getElementById('clearToken').onclick = () => {
+    localStorage.removeItem('datafogAdminToken');
+    document.getElementById('apiToken').value = '';
+    refreshOverview();
+  };
+
+  document.getElementById('scanBtn').onclick = async () => {
+    const text = document.getElementById('scanText').value || '';
+    const out = document.getElementById('scanDecideOut');
+    out.textContent = 'Running scan...';
+    const res = await callApi('/v1/scan', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+    if (res.status !== 200) {
+      return renderErrorMessage(out, res.body.error || res.body, 'scan failed');
+    }
+    out.textContent = JSON.stringify(res.body, null, 2);
+  };
+
+  document.getElementById('decideBtn').onclick = async () => {
+    const actionType = document.getElementById('actionType').value.trim();
+    const resource = document.getElementById('actionResource').value.trim();
+    const text = document.getElementById('scanText').value || '';
+    const out = document.getElementById('scanDecideOut');
+    out.textContent = 'Running decide...';
+    const body = {
+      action: { type: actionType, resource },
+      text,
+    };
+    const res = await callApi('/v1/decide', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    if (res.status !== 200) {
+      return renderErrorMessage(out, res.body.error || res.body, 'decide failed');
+    }
+    out.textContent = JSON.stringify(res.body, null, 2);
+  };
+
+  document.getElementById('receiptBtn').onclick = async () => {
+    const id = (document.getElementById('receiptID').value || '').trim();
+    const out = document.getElementById('receiptOut');
+    if (!id) {
+      out.textContent = 'Please enter receipt id';
+      return;
+    }
+    out.textContent = 'Loading...';
+    const res = await callApi(`/v1/receipts/${encodeURIComponent(id)}`);
+    if (res.status !== 200) {
+      return renderErrorMessage(out, res.body.error || res.body, 'receipt load failed');
+    }
+    out.textContent = JSON.stringify(res.body, null, 2);
+  };
+
+  document.getElementById('eventsBtn').onclick = async () => {
+    const decision = document.getElementById('eventDecision').value;
+    const limit = Number(document.getElementById('eventLimit').value || 10);
+    const out = document.getElementById('eventsOut');
+    const params = new URLSearchParams();
+    params.set('limit', String(Math.min(Math.max(limit, 1), 1000)));
+    if (decision) {
+      params.set('decision', decision);
+    }
+    out.textContent = 'Loading...';
+    const res = await callApi(`/v1/events?${params.toString()}`);
+    if (res.status !== 200) {
+      return renderErrorMessage(out, res.body.error || res.body, 'events load failed');
+    }
+    out.textContent = JSON.stringify(res.body, null, 2);
+  };
+
+  document.getElementById('receiptsBtn').onclick = async () => {
+    const decision = document.getElementById('receiptDecision').value;
+    const limit = Number(document.getElementById('receiptLimit').value || 10);
+    const out = document.getElementById('receiptsOut');
+    const params = new URLSearchParams();
+    params.set('limit', String(Math.min(Math.max(limit, 1), 1000)));
+    if (decision) {
+      params.set('decision', decision);
+    }
+    out.textContent = 'Loading...';
+    const res = await callApi(`/v1/receipts?${params.toString()}`);
+    if (res.status !== 200) {
+      return renderErrorMessage(out, res.body.error || res.body, 'receipts load failed');
+    }
+    out.textContent = JSON.stringify(res.body, null, 2);
+  };
+}
+
+getToken();
+bindActions();
+refreshOverview();
+</script>
+</body>
+</html>

@@ -1,11 +1,12 @@
 module github.com/datafog/datafog-api
 
-go 1.22
+go 1.24.0
 
 require (
 	github.com/felixge/fgprof v0.9.5
 	go.uber.org/automaxprocs v1.6.0
 	go.uber.org/goleak v1.3.0
+	golang.org/x/sync v0.19.0
 )
 
 require github.com/google/pprof v0.0.0-20240227163752-401108e1b7e7 // indirect

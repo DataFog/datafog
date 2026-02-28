@@ -1,7 +1,11 @@
 package scan
 
 import (
+	"context"
 	"regexp"
+	"runtime"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/datafog/datafog-api/internal/models"
 )
@@ -77,41 +81,91 @@ var defaultScanEntityTypes = []string{
 
 func ScanText(text string, entityFilter []string) []models.ScanFinding {
 	requested := requestedEntitySet(entityFilter)
+	if text == "" {
+		return nil
+	}
 
-	findings := make([]models.ScanFinding, 0)
-
-	// Phase 1: Regex engine (fast, always available)
+	targets := make([]string, 0, len(defaultScanEntityTypes))
 	for _, entityType := range defaultScanEntityTypes {
 		if shouldRunEntityType(requested, entityType) {
-			pattern := DefaultEntityPatterns[entityType]
-			idxs := pattern.Re.FindAllStringIndex(text, -1)
-			for _, idx := range idxs {
-				if len(idx) != 2 || idx[0] < 0 || idx[1] < idx[0] {
-					continue
-				}
-				value := text[idx[0]:idx[1]]
-				if pattern.Validate != nil && !pattern.Validate(value) {
-					continue
-				}
-				findings = append(findings, models.ScanFinding{
-					EntityType: entityType,
-					Value:      value,
-					Start:      idx[0],
-					End:        idx[1],
-					Confidence: DefaultEntityConfidences[entityType],
-				})
-			}
+			targets = append(targets, entityType)
 		}
+	}
+
+	chunked := make([][]models.ScanFinding, len(targets))
+	if len(targets) > 0 {
+		g, _ := errgroup.WithContext(context.Background())
+		limit := scanWorkers()
+		if limit > 1 {
+			g.SetLimit(limit)
+		}
+		for i, entityType := range targets {
+			i := i
+			entityType := entityType
+			pattern, ok := DefaultEntityPatterns[entityType]
+			if !ok || pattern.Re == nil {
+				continue
+			}
+			g.Go(func() error {
+				local := findMatchesForPattern(text, entityType, pattern)
+				chunked[i] = local
+				return nil
+			})
+		}
+		_ = g.Wait()
+	}
+
+	findings := make([]models.ScanFinding, 0)
+	for _, chunk := range chunked {
+		if len(chunk) == 0 {
+			continue
+		}
+		findings = append(findings, chunk...)
 	}
 
 	if !shouldRunNERForFilter(requested) {
 		return findings
 	}
-
-	// Phase 2: NER engine (heuristic, when enabled)
 	findings = append(findings, scanNERWithFilter(text, requested)...)
-
 	return findings
+}
+
+func findMatchesForPattern(text string, entityType string, pattern EntityPattern) []models.ScanFinding {
+	if text == "" || pattern.Re == nil {
+		return nil
+	}
+
+	idxs := pattern.Re.FindAllStringIndex(text, -1)
+	if len(idxs) == 0 {
+		return nil
+	}
+
+	results := make([]models.ScanFinding, 0, len(idxs))
+	for _, idx := range idxs {
+		if len(idx) != 2 || idx[0] < 0 || idx[1] < idx[0] {
+			continue
+		}
+		value := text[idx[0]:idx[1]]
+		if pattern.Validate != nil && !pattern.Validate(value) {
+			continue
+		}
+		results = append(results, models.ScanFinding{
+			EntityType: entityType,
+			Value:      value,
+			Start:      idx[0],
+			End:        idx[1],
+			Confidence: DefaultEntityConfidences[entityType],
+		})
+	}
+	return results
+}
+
+func scanWorkers() int {
+	workers := runtime.GOMAXPROCS(0)
+	if workers < 1 {
+		return 1
+	}
+	return workers
 }
 
 // luhnValid implements the Luhn algorithm to validate credit card numbers.

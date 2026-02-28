@@ -103,6 +103,8 @@ If you set `DATAFOG_API_TOKEN`, send it on every request using:
 | `DATAFOG_FGPROF` | `false` | Add `/debug/fgprof` endpoint to the profiling server |
 | `DATAFOG_ENABLE_DEMO` | *(unset)* | Enable `/demo*` endpoints |
 | `DATAFOG_DEMO_HTML` | `docs/demo.html` | Path to demo HTML |
+| `DATAFOG_ENABLE_ADMIN_UI` | *(unset)* | Enable read-only `GET /admin` |
+| `DATAFOG_ADMIN_HTML` | `docs/admin.html` | Path to static admin dashboard HTML |
 
 Duration values use Go duration syntax, for example `1s`, `500ms`, `2m`.
 
@@ -118,8 +120,10 @@ Base URL defaults to `http://localhost:8080`.
 | `POST` | `/v1/decide` | Evaluate an action + findings and get a decision |
 | `POST` | `/v1/transform` | Apply requested transform mode(s) |
 | `POST` | `/v1/anonymize` | Apply irreversible anonymization |
+| `GET` | `/v1/receipts` | List recent decision receipts |
 | `GET` | `/v1/receipts/{id}` | Read a decision receipt |
 | `GET` | `/v1/events` | List recent decision events |
+| `GET` | `/admin` | Read-only operational dashboard (requires DATAFOG_ENABLE_ADMIN_UI) |
 | `GET` | `/metrics` | In-process metrics counters |
 
 Optional demo routes (only when demo mode is enabled):
@@ -190,6 +194,12 @@ curl -X POST http://localhost:8080/v1/transform \
     "findings": [{"entity_type":"email","value":"alice@example.com","start":18,"end":34,"confidence":0.99}],
     "mode":"mask"
   }'
+```
+
+### List receipts (admin/read-only)
+
+```sh
+curl 'http://localhost:8080/v1/receipts?limit=20&decision=allow'
 ```
 
 ### Fetch a receipt
