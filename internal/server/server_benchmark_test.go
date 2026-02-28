@@ -54,6 +54,9 @@ func benchmarkServer(b *testing.B) *http.Server {
 	if err != nil {
 		b.Fatalf("new store: %v", err)
 	}
+	b.Cleanup(func() {
+		_ = store.Close()
+	})
 	h := New(testPolicy(), store, log.New(io.Discard, "", 0), "", 0)
 	return &http.Server{Handler: h.Handler()}
 }

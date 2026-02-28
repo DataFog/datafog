@@ -33,6 +33,7 @@ func main() {
 	rateLimitRPS := getenvInt("DATAFOG_RATE_LIMIT_RPS", 0)
 	shutdownTimeout := getenvDuration("DATAFOG_SHUTDOWN_TIMEOUT", 10*time.Second)
 	enableDemo := getenv("DATAFOG_ENABLE_DEMO", "") != "" || hasFlag("--enable-demo")
+	enableAdmin := getenvBool("DATAFOG_ENABLE_ADMIN_UI", false) || hasFlag("--enable-admin-ui")
 	eventsPath := getenv("DATAFOG_EVENTS_PATH", "")
 	pprofAddr := getenv("DATAFOG_PPROF_ADDR", "")
 	fgprofEnabled := getenvBool("DATAFOG_FGPROF", false)
@@ -60,23 +61,46 @@ func main() {
 		h.SetEventReader(eventReader)
 	}
 
-	var handler http.Handler
+	var demo *server.DemoHandler
 	if enableDemo {
 		// Create a shim gate backed by a local HTTP decision client
 		client := shim.NewHTTPDecisionClient("http://127.0.0.1"+addr, apiToken)
 		gate := shim.NewGate(client, shim.WithEventSink(eventSink))
 
 		demoHTMLPath := getenv("DATAFOG_DEMO_HTML", "docs/demo.html")
-		demo, err := server.NewDemoHandler(gate, h, demoHTMLPath)
+		demo, err = server.NewDemoHandler(gate, h, demoHTMLPath)
 		if err != nil {
 			log.Fatalf("init demo: %v", err)
 		}
 		defer demo.Cleanup()
+	}
 
+	var admin *server.AdminHandler
+	if enableAdmin {
+		adminHTMLPath := getenv("DATAFOG_ADMIN_HTML", "docs/admin.html")
+		admin, err = server.NewAdminHandler(adminHTMLPath)
+		if err != nil {
+			log.Fatalf("init admin UI: %v", err)
+		}
+	}
+
+	var handler http.Handler
+	switch {
+	case demo != nil && admin != nil:
+		handler = h.HandlerWithDemoAndAdmin(demo, admin)
+	case demo != nil:
 		handler = h.HandlerWithDemo(demo)
-		log.Printf("demo mode enabled — /demo/exec, /demo/write-file, /demo/read-file available")
-	} else {
+	case admin != nil:
+		handler = h.HandlerWithAdmin(admin)
+	default:
 		handler = h.Handler()
+	}
+
+	if enableDemo {
+		log.Printf("demo mode enabled — /demo/exec, /demo/write-file, /demo/read-file available")
+	}
+	if enableAdmin {
+		log.Printf("admin UI enabled — /admin available")
 	}
 
 	var pprofSrv *http.Server
@@ -128,6 +152,9 @@ func main() {
 			if closeErr := srv.Close(); closeErr != nil && !errors.Is(closeErr, http.ErrServerClosed) {
 				log.Printf("forced close failed: %v", closeErr)
 			}
+		}
+		if err := h.Shutdown(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			log.Printf("application shutdown helper failed: %v", err)
 		}
 		if err := <-done; err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Printf("server stopped with error: %v", err)

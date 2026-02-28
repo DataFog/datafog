@@ -1,6 +1,7 @@
 package server
 
 import (
+	"compress/gzip"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -25,30 +26,25 @@ import (
 	"github.com/datafog/datafog-api/internal/scan"
 	"github.com/datafog/datafog-api/internal/shim"
 	"github.com/datafog/datafog-api/internal/transform"
+	"github.com/datafog/datafog-api/internal/types/ttlcache"
 )
 
 type Server struct {
-	policy            models.Policy
-	store             *receipts.ReceiptStore
-	eventReader       shim.EventReader
-	apiToken          string
-	rateLimiter       *tokenBucket
-	startedAt         time.Time
-	logger            *log.Logger
-	mu                sync.Mutex
-	statsMu           sync.Mutex
-	decisions         map[string]idempotentDecision
-	scans             map[string]idempotentCachedResponse
-	transforms        map[string]idempotentCachedResponse
-	anonymizes        map[string]idempotentCachedResponse
-	totalCount        int64
-	errorCount        int64
-	statusHits        map[int]int64
-	pathHits          map[string]int64
-	methodHits        map[string]int64
-	totalLatencyNs    int64
-	pathLatencyNs     map[string]int64
-	pathLatencyCounts map[string]int64
+	policy      models.Policy
+	policyIndex *policy.PolicyIndex
+	store       *receipts.ReceiptStore
+	eventReader shim.EventReader
+	eventSink   shim.DecisionEventSink
+	apiToken    string
+	rateLimiter *tokenBucket
+	startedAt   time.Time
+	logger      *log.Logger
+
+	decisions  *ttlcache.Cache[idempotentDecisionResponse]
+	scans      *ttlcache.Cache[idempotentCachedResponse]
+	transforms *ttlcache.Cache[idempotentCachedResponse]
+	anonymizes *ttlcache.Cache[idempotentCachedResponse]
+	metrics    *requestMetrics
 }
 
 type requestIDContextKey struct{}
@@ -70,11 +66,67 @@ func (w *responseStatusWriter) Write(body []byte) (int, error) {
 	return w.ResponseWriter.Write(body)
 }
 
+type gzipResponseWriter struct {
+	ResponseWriter http.ResponseWriter
+	writer         *gzip.Writer
+	wroteHeader    bool
+	status         int
+}
+
+func (w *gzipResponseWriter) Header() http.Header {
+	return w.ResponseWriter.Header()
+}
+
+func (w *gzipResponseWriter) WriteHeader(statusCode int) {
+	if w.wroteHeader {
+		return
+	}
+	w.wroteHeader = true
+	w.status = statusCode
+
+	w.ResponseWriter.Header().Del("Content-Length")
+	w.ResponseWriter.Header().Set("Content-Encoding", "gzip")
+	w.ResponseWriter.Header().Set("Vary", "Accept-Encoding")
+	if w.writer == nil {
+		writer := gzip.NewWriter(w.ResponseWriter)
+		w.writer = writer
+	}
+	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (w *gzipResponseWriter) Write(body []byte) (int, error) {
+	if w.status == 0 {
+		w.WriteHeader(http.StatusOK)
+	}
+	if w.writer == nil {
+		w.writer = gzip.NewWriter(w.ResponseWriter)
+	}
+	return w.writer.Write(body)
+}
+
+func (w *gzipResponseWriter) Close() error {
+	if w.writer == nil {
+		return nil
+	}
+	return w.writer.Close()
+}
+
+func shouldCompressResponse(r *http.Request) bool {
+	enc := strings.ToLower(r.Header.Get("Accept-Encoding"))
+	if enc == "" {
+		return false
+	}
+	return strings.Contains(enc, "gzip")
+}
+
 const (
 	maxRequestBodyBytes int64 = 1024 * 1024 // 1 MiB
+
+	defaultIdempotencyCacheSize = 4096
+	defaultIdempotencyTTL       = 30 * time.Minute
 )
 
-type idempotentDecision struct {
+type idempotentDecisionResponse struct {
 	requestHash string
 	response    models.DecideResponse
 }
@@ -103,31 +155,77 @@ func New(policyData models.Policy, store *receipts.ReceiptStore, logger *log.Log
 	}
 	policyData = policy.NormalizeForEvaluation(policyData)
 	return &Server{
-		policy:            policyData,
-		store:             store,
-		apiToken:          apiToken,
-		rateLimiter:       newTokenBucket(rateLimitRPS),
-		startedAt:         time.Now().UTC(),
-		logger:            logger,
-		decisions:         map[string]idempotentDecision{},
-		scans:             map[string]idempotentCachedResponse{},
-		transforms:        map[string]idempotentCachedResponse{},
-		anonymizes:        map[string]idempotentCachedResponse{},
-		statusHits:        map[int]int64{},
-		pathHits:          map[string]int64{},
-		methodHits:        map[string]int64{},
-		totalLatencyNs:    0,
-		pathLatencyNs:     map[string]int64{},
-		pathLatencyCounts: map[string]int64{},
+		policy:      policyData,
+		policyIndex: policy.BuildPolicyIndex(policyData),
+		store:       store,
+		apiToken:    apiToken,
+		rateLimiter: newTokenBucket(rateLimitRPS),
+		startedAt:   time.Now().UTC(),
+		logger:      logger,
+		decisions:   ttlcache.New[idempotentDecisionResponse](defaultIdempotencyCacheSize, defaultIdempotencyTTL),
+		scans:       ttlcache.New[idempotentCachedResponse](defaultIdempotencyCacheSize, defaultIdempotencyTTL),
+		transforms:  ttlcache.New[idempotentCachedResponse](defaultIdempotencyCacheSize, defaultIdempotencyTTL),
+		anonymizes:  ttlcache.New[idempotentCachedResponse](defaultIdempotencyCacheSize, defaultIdempotencyTTL),
+		metrics:     newRequestMetrics(),
 	}
 }
 
 func (s *Server) SetEventReader(reader shim.EventReader) {
 	s.eventReader = reader
+	if sink, ok := reader.(shim.DecisionEventSink); ok {
+		s.eventSink = sink
+	}
+}
+
+func (s *Server) Shutdown(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	done := make(chan error, 1)
+	go func() {
+		if s.decisions != nil {
+			s.decisions.Close()
+		}
+		if s.scans != nil {
+			s.scans.Close()
+		}
+		if s.transforms != nil {
+			s.transforms.Close()
+		}
+		if s.anonymizes != nil {
+			s.anonymizes.Close()
+		}
+		if s.eventSink != nil {
+			if closer, ok := s.eventSink.(interface{ Close() error }); ok {
+				_ = closer.Close()
+			}
+		}
+		if s.store != nil {
+			_ = s.store.Close()
+		}
+		done <- nil
+	}()
+
+	select {
+	case err := <-done:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // HandlerWithDemo returns the HTTP handler with optional demo endpoints registered.
 func (s *Server) HandlerWithDemo(demo *DemoHandler) http.Handler {
+	return s.HandlerWithDemoAndAdmin(demo, nil)
+}
+
+// HandlerWithAdmin returns the HTTP handler with optional admin endpoints registered.
+func (s *Server) HandlerWithAdmin(admin *AdminHandler) http.Handler {
+	return s.HandlerWithDemoAndAdmin(nil, admin)
+}
+
+// HandlerWithDemoAndAdmin returns the HTTP handler with optional demo and admin endpoints.
+func (s *Server) HandlerWithDemoAndAdmin(demo *DemoHandler, admin *AdminHandler) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/v1/policy/version", s.handlePolicyVersion)
@@ -135,17 +233,21 @@ func (s *Server) HandlerWithDemo(demo *DemoHandler) http.Handler {
 	mux.HandleFunc("/v1/decide", s.handleDecide)
 	mux.HandleFunc("/v1/transform", s.handleTransform)
 	mux.HandleFunc("/v1/anonymize", s.handleAnonymize)
+	mux.HandleFunc("/v1/receipts", s.handleReceipts)
 	mux.HandleFunc("/v1/receipts/", s.handleReceipt)
 	mux.HandleFunc("/v1/events", s.handleEvents)
 	mux.HandleFunc("/metrics", s.handleMetrics)
 	if demo != nil {
 		demo.Register(mux)
 	}
+	if admin != nil {
+		admin.Register(mux)
+	}
 	return s.wrapMiddleware(mux)
 }
 
 func (s *Server) Handler() http.Handler {
-	return s.HandlerWithDemo(nil)
+	return s.HandlerWithDemoAndAdmin(nil, nil)
 }
 
 func (s *Server) wrapMiddleware(mux *http.ServeMux) http.Handler {
@@ -169,25 +271,34 @@ func (s *Server) wrapMiddleware(mux *http.ServeMux) http.Handler {
 		r = r.WithContext(context.WithValue(r.Context(), requestIDContextKey{}, reqID))
 		w.Header().Set("X-Request-ID", reqID)
 
-		responseWriter := &responseStatusWriter{ResponseWriter: w}
+		statusWriter := &responseStatusWriter{ResponseWriter: w}
+		responseWriter := http.ResponseWriter(statusWriter)
+		if shouldCompressResponse(r) {
+			responseWriter = &gzipResponseWriter{ResponseWriter: statusWriter}
+		}
 		startedAt := time.Now()
 		handler, pattern := mux.Handler(r)
 		defer func() {
 			latency := time.Since(startedAt)
 			if rec := recover(); rec != nil {
-				responseWriter.status = http.StatusInternalServerError
+				statusWriter.status = http.StatusInternalServerError
 				s.logger.Printf("request panic request_id=%s method=%s path=%s err=%v", reqID, r.Method, r.URL.Path, rec)
-				s.respondError(responseWriter, http.StatusInternalServerError, models.APIError{Code: "internal_error", Message: "internal server error", RequestID: reqID})
+				s.respondError(statusWriter, http.StatusInternalServerError, models.APIError{Code: "internal_error", Message: "internal server error", RequestID: reqID})
 			}
-			if responseWriter.status == 0 {
-				responseWriter.status = http.StatusOK
+			if statusWriter.status == 0 {
+				statusWriter.status = http.StatusOK
 			}
 			if pattern == "" {
-				s.recordRequestMetrics(r.Method, "/_not_found", responseWriter.status, latency)
+				s.recordRequestMetrics(r.Method, "/_not_found", statusWriter.status, latency)
 			} else {
-				s.recordRequestMetrics(r.Method, canonicalizedRoute(pattern, r.URL.Path), responseWriter.status, latency)
+				s.recordRequestMetrics(r.Method, canonicalizedRoute(pattern, r.URL.Path), statusWriter.status, latency)
 			}
-			s.logger.Printf("request complete request_id=%s method=%s path=%s status=%d latency_ms=%d", reqID, r.Method, r.URL.Path, responseWriter.status, latency.Milliseconds())
+			s.logger.Printf("request complete request_id=%s method=%s path=%s status=%d latency_ms=%d", reqID, r.Method, r.URL.Path, statusWriter.status, latency.Milliseconds())
+			if gzipWriter, ok := responseWriter.(*gzipResponseWriter); ok {
+				if err := gzipWriter.Close(); err != nil {
+					s.logger.Printf("gzip close failed request_id=%s: %v", reqID, err)
+				}
+			}
 		}()
 
 		if !s.authorized(r) {
@@ -286,20 +397,7 @@ func canonicalizedRoute(pattern string, path string) string {
 }
 
 func (s *Server) recordRequestMetrics(method string, route string, status int, latency time.Duration) {
-	s.statsMu.Lock()
-	defer s.statsMu.Unlock()
-	s.totalCount++
-	s.methodHits[method]++
-	s.pathHits[route]++
-	s.statusHits[status]++
-	if status >= 400 {
-		s.errorCount++
-	}
-
-	latencyNs := latency.Nanoseconds()
-	s.totalLatencyNs += latencyNs
-	s.pathLatencyNs[route] += latencyNs
-	s.pathLatencyCounts[route]++
+	s.metrics.record(method, route, status, latency.Nanoseconds())
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -353,15 +451,12 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 			s.respondError(w, http.StatusBadRequest, models.APIError{Code: "invalid_request", Message: "unable to hash request payload", Details: err.Error(), RequestID: requestID(r)})
 			return
 		}
-		s.mu.Lock()
-		existing, ok := s.scans[req.IdempotencyKey]
-		s.mu.Unlock()
-		if ok {
-			if existing.requestHash != reqHash {
+		if cached, ok := s.scans.Get(req.IdempotencyKey); ok {
+			if cached.requestHash != reqHash {
 				s.respondError(w, http.StatusConflict, models.APIError{Code: "idempotency_conflict", Message: "different request payload for same idempotency_key", RequestID: requestID(r)})
 				return
 			}
-			s.respondRaw(w, existing.status, existing.body)
+			s.respondRaw(w, cached.status, cached.body)
 			return
 		}
 	}
@@ -381,13 +476,11 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		hash, _ := hashScanRequest(req)
-		s.mu.Lock()
-		s.scans[req.IdempotencyKey] = idempotentCachedResponse{
+		s.scans.Set(req.IdempotencyKey, idempotentCachedResponse{
 			requestHash: hash,
 			body:        body,
 			status:      http.StatusOK,
-		}
-		s.mu.Unlock()
+		})
 		s.respondRaw(w, http.StatusOK, body)
 		return
 	}
@@ -420,15 +513,12 @@ func (s *Server) handleDecide(w http.ResponseWriter, r *http.Request) {
 			s.respondError(w, http.StatusBadRequest, models.APIError{Code: "invalid_request", Message: "unable to hash request payload", Details: err.Error(), RequestID: requestID(r)})
 			return
 		}
-		s.mu.Lock()
-		existing, ok := s.decisions[req.IdempotencyKey]
-		s.mu.Unlock()
-		if ok {
-			if existing.requestHash != reqHash {
+		if cached, ok := s.decisions.Get(req.IdempotencyKey); ok {
+			if cached.requestHash != reqHash {
 				s.respondError(w, http.StatusConflict, models.APIError{Code: "idempotency_conflict", Message: "different request payload for same idempotency_key", RequestID: requestID(r)})
 				return
 			}
-			s.respond(w, http.StatusOK, existing.response)
+			s.respond(w, http.StatusOK, cached.response)
 			return
 		}
 	}
@@ -437,7 +527,7 @@ func (s *Server) handleDecide(w http.ResponseWriter, r *http.Request) {
 	if len(findings) == 0 && req.Text != "" {
 		findings = scan.ScanText(req.Text, nil)
 	}
-	result := policy.EvaluateSorted(s.policy, policy.DecisionContext{Action: req.Action, Findings: findings})
+	result := policy.EvaluateWithIndex(s.policy, s.policyIndex, policy.DecisionContext{Action: req.Action, Findings: findings})
 	actionHash, err := hashDecideAction(req.Action)
 	if err != nil {
 		s.respondError(w, http.StatusInternalServerError, models.APIError{Code: "hash_error", Message: "unable to hash action", Details: err.Error(), RequestID: requestID(r)})
@@ -480,12 +570,10 @@ func (s *Server) handleDecide(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.IdempotencyKey != "" {
 		hash, _ := hashDecideRequest(req)
-		s.mu.Lock()
-		s.decisions[req.IdempotencyKey] = idempotentDecision{
+		s.decisions.Set(req.IdempotencyKey, idempotentDecisionResponse{
 			requestHash: hash,
 			response:    res,
-		}
-		s.mu.Unlock()
+		})
 	}
 	s.respond(w, http.StatusOK, res)
 }
@@ -540,15 +628,12 @@ func (s *Server) handleTransform(w http.ResponseWriter, r *http.Request) {
 			s.respondError(w, http.StatusBadRequest, models.APIError{Code: "invalid_request", Message: "unable to hash request payload", Details: err.Error(), RequestID: requestID(r)})
 			return
 		}
-		s.mu.Lock()
-		existing, ok := s.transforms[req.IdempotencyKey]
-		s.mu.Unlock()
-		if ok {
-			if existing.requestHash != reqHash {
+		if cached, ok := s.transforms.Get(req.IdempotencyKey); ok {
+			if cached.requestHash != reqHash {
 				s.respondError(w, http.StatusConflict, models.APIError{Code: "idempotency_conflict", Message: "different request payload for same idempotency_key", RequestID: requestID(r)})
 				return
 			}
-			s.respondRaw(w, existing.status, existing.body)
+			s.respondRaw(w, cached.status, cached.body)
 			return
 		}
 	}
@@ -588,13 +673,11 @@ func (s *Server) handleTransform(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		hash, _ := hashTransformRequest(req)
-		s.mu.Lock()
-		s.transforms[req.IdempotencyKey] = idempotentCachedResponse{
+		s.transforms.Set(req.IdempotencyKey, idempotentCachedResponse{
 			requestHash: hash,
 			body:        body,
 			status:      http.StatusOK,
-		}
-		s.mu.Unlock()
+		})
 		s.respondRaw(w, http.StatusOK, body)
 		return
 	}
@@ -627,15 +710,12 @@ func (s *Server) handleAnonymize(w http.ResponseWriter, r *http.Request) {
 			s.respondError(w, http.StatusBadRequest, models.APIError{Code: "invalid_request", Message: "unable to hash request payload", Details: err.Error(), RequestID: requestID(r)})
 			return
 		}
-		s.mu.Lock()
-		existing, ok := s.anonymizes[req.IdempotencyKey]
-		s.mu.Unlock()
-		if ok {
-			if existing.requestHash != reqHash {
+		if cached, ok := s.anonymizes.Get(req.IdempotencyKey); ok {
+			if cached.requestHash != reqHash {
 				s.respondError(w, http.StatusConflict, models.APIError{Code: "idempotency_conflict", Message: "different request payload for same idempotency_key", RequestID: requestID(r)})
 				return
 			}
-			s.respondRaw(w, existing.status, existing.body)
+			s.respondRaw(w, cached.status, cached.body)
 			return
 		}
 	}
@@ -671,13 +751,11 @@ func (s *Server) handleAnonymize(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		hash, _ := hashAnonymizeRequest(req)
-		s.mu.Lock()
-		s.anonymizes[req.IdempotencyKey] = idempotentCachedResponse{
+		s.anonymizes.Set(req.IdempotencyKey, idempotentCachedResponse{
 			requestHash: hash,
 			body:        body,
 			status:      http.StatusOK,
-		}
-		s.mu.Unlock()
+		})
 		s.respondRaw(w, http.StatusOK, body)
 		return
 	}
@@ -742,47 +820,51 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) snapshotMetrics() metricsResponse {
-	s.statsMu.Lock()
-	defer s.statsMu.Unlock()
-	byStatus := map[string]int64{}
-	for status, count := range s.statusHits {
-		byStatus[strconv.Itoa(status)] = count
-	}
-
-	byPath := map[string]int64{}
-	for path, count := range s.pathHits {
-		byPath[path] = count
-	}
-
-	byMethod := map[string]int64{}
-	for method, count := range s.methodHits {
-		byMethod[method] = count
-	}
-
-	byPathLatency := map[string]float64{}
-	for path, count := range s.pathLatencyCounts {
-		if count == 0 {
-			continue
-		}
-		byPathLatency[path] = float64(s.pathLatencyNs[path]) / float64(count) / float64(time.Millisecond)
-	}
-
-	avgLatencyMs := 0.0
-	if s.totalCount > 0 {
-		avgLatencyMs = float64(s.totalLatencyNs) / float64(s.totalCount) / float64(time.Millisecond)
-	}
-
+	total, errors, avgLatency, byMethod, byPath, byStatus, byPathLatency := s.metrics.snapshot()
 	return metricsResponse{
-		TotalRequests: s.totalCount,
-		ErrorRequests: s.errorCount,
+		TotalRequests: total,
+		ErrorRequests: errors,
 		ByStatus:      byStatus,
 		ByPath:        byPath,
 		ByMethod:      byMethod,
 		ByPathLatency: byPathLatency,
-		AvgLatencyMs:  avgLatencyMs,
+		AvgLatencyMs:  avgLatency,
 		StartedAt:     s.startedAt.Format(time.RFC3339),
 		UptimeSeconds: time.Since(s.startedAt).Seconds(),
 	}
+}
+
+func (s *Server) handleReceipts(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.respondError(w, http.StatusMethodNotAllowed, models.APIError{Code: "method_not_allowed", Message: "method must be GET", RequestID: requestID(r)})
+		return
+	}
+
+	q := receipts.ListQuery{Limit: 100}
+	if limit := strings.TrimSpace(r.URL.Query().Get("limit")); limit != "" {
+		if n, err := strconv.Atoi(limit); err == nil && n > 0 && n <= 1000 {
+			q.Limit = n
+		}
+	}
+	if after := strings.TrimSpace(r.URL.Query().Get("after")); after != "" {
+		if t, err := time.Parse(time.RFC3339, after); err == nil {
+			q.After = &t
+		}
+	}
+	if before := strings.TrimSpace(r.URL.Query().Get("before")); before != "" {
+		if t, err := time.Parse(time.RFC3339, before); err == nil {
+			q.Before = &t
+		}
+	}
+	if decision := strings.TrimSpace(r.URL.Query().Get("decision")); decision != "" {
+		q.Decision = decision
+	}
+	if actionType := strings.TrimSpace(r.URL.Query().Get("action_type")); actionType != "" {
+		q.ActionType = actionType
+	}
+
+	entries, total := s.store.List(q)
+	s.respond(w, http.StatusOK, map[string]interface{}{"receipts": entries, "total": total})
 }
 
 func (s *Server) handleReceipt(w http.ResponseWriter, r *http.Request) {
@@ -793,7 +875,7 @@ func (s *Server) handleReceipt(w http.ResponseWriter, r *http.Request) {
 
 	id := strings.TrimPrefix(r.URL.Path, "/v1/receipts/")
 	if id == "" || strings.Contains(id, "/") {
-		s.respondError(w, http.StatusNotFound, models.APIError{Code: "not_found", Message: "receipt id missing"})
+		s.respondError(w, http.StatusNotFound, models.APIError{Code: "not_found", Message: "receipt id missing", RequestID: requestID(r)})
 		return
 	}
 	receipt, ok := s.store.Get(id)

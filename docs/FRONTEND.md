@@ -9,6 +9,7 @@ DataFog API is a backend-first project. There is no React/Vue/Next.js applicatio
 
 - Primary user-facing UI is API-first: clients interact through HTTP endpoints.
 - Optional demo assets are static HTML in `docs/demo.html` and rendered by `GET /demo` when demo mode is enabled.
+- Optional admin dashboard is static HTML in `docs/admin.html` and rendered by `GET /admin` when admin UI mode is enabled.
 
 ## Conventions
 

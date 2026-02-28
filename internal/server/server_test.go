@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -41,6 +42,9 @@ func makeServerWithTokenAndRateLimit(t *testing.T, apiToken string, rateLimitRPS
 	if err != nil {
 		t.Fatalf("new store: %v", err)
 	}
+	t.Cleanup(func() {
+		_ = store.Close()
+	})
 	h := New(testPolicy(), store, nil, apiToken, rateLimitRPS)
 	return &http.Server{Handler: h.Handler()}
 }
@@ -135,6 +139,88 @@ func TestTokenAuth(t *testing.T) {
 		server.Handler.ServeHTTP(resp, req)
 		assertJSONError(t, resp, http.StatusUnauthorized, "unauthorized")
 	})
+}
+
+func TestAdminAndReceiptListEndpoints(t *testing.T) {
+	tmp := t.TempDir()
+	storePath := tmp + "/receipts.jsonl"
+	store, err := receipts.NewReceiptStore(storePath)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = store.Close()
+	})
+
+	if _, err := store.Save(models.Receipt{ReceiptID: "r1", Decision: models.DecisionAllow, Action: models.ActionMeta{Type: "file.write"}, Timestamp: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)}); err != nil {
+		t.Fatalf("save receipt failed: %v", err)
+	}
+	if _, err := store.Save(models.Receipt{ReceiptID: "r2", Decision: models.DecisionDeny, Action: models.ActionMeta{Type: "shell.exec"}, Timestamp: time.Date(2026, 1, 2, 3, 5, 0, 0, time.UTC)}); err != nil {
+		t.Fatalf("save receipt failed: %v", err)
+	}
+
+	h := New(testPolicy(), store, nil, "", 0)
+	srv := &http.Server{Handler: h.Handler()}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/receipts", nil)
+	resp := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(resp, req)
+	assertJSONError(t, resp, http.StatusMethodNotAllowed, "method_not_allowed")
+
+	listReq := httptest.NewRequest(http.MethodGet, "/v1/receipts?limit=10", nil)
+	listResp := httptest.NewRecorder()
+	srv.Handler.ServeHTTP(listResp, listReq)
+	if listResp.Code != http.StatusOK {
+		t.Fatalf("expected 200 for receipt list, got %d", listResp.Code)
+	}
+	var got struct {
+		Receipts []models.Receipt `json:"receipts"`
+		Total    int              `json:"total"`
+	}
+	if err := json.NewDecoder(listResp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if got.Total != 2 {
+		t.Fatalf("expected 2 total receipts, got %d", got.Total)
+	}
+	if len(got.Receipts) != 2 {
+		t.Fatalf("expected 2 receipts in payload, got %d", len(got.Receipts))
+	}
+	if got.Receipts[0].ReceiptID != "r2" {
+		t.Fatalf("expected newest receipt first, got %s", got.Receipts[0].ReceiptID)
+	}
+
+	filteredReq := httptest.NewRequest(http.MethodGet, "/v1/receipts?decision=allow&limit=10", nil)
+	filteredResp := httptest.NewRecorder()
+	h.Handler().ServeHTTP(filteredResp, filteredReq)
+	if filteredResp.Code != http.StatusOK {
+		t.Fatalf("expected 200 for filtered receipt list, got %d", filteredResp.Code)
+	}
+	if err := json.NewDecoder(filteredResp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode filtered payload failed: %v", err)
+	}
+	if got.Total != 1 {
+		t.Fatalf("expected 1 allow receipt, got %d", got.Total)
+	}
+
+	adminHTMLPath := tmp + "/admin.html"
+	if err := os.WriteFile(adminHTMLPath, []byte("<html><body>admin-ui-ok</body></html>"), 0o644); err != nil {
+		t.Fatalf("write admin html: %v", err)
+	}
+	admin, err := NewAdminHandler(adminHTMLPath)
+	if err != nil {
+		t.Fatalf("new admin handler: %v", err)
+	}
+	adminServer := &http.Server{Handler: h.HandlerWithAdmin(admin)}
+	adminReq := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	adminResp := httptest.NewRecorder()
+	adminServer.Handler.ServeHTTP(adminResp, adminReq)
+	if adminResp.Code != http.StatusOK {
+		t.Fatalf("expected admin endpoint 200, got %d", adminResp.Code)
+	}
+	if strings.TrimSpace(adminResp.Body.String()) != "<html><body>admin-ui-ok</body></html>" {
+		t.Fatalf("expected custom admin html body")
+	}
 }
 
 func TestRateLimit(t *testing.T) {
@@ -719,6 +805,7 @@ func TestValidateMethodAndBadInputs(t *testing.T) {
 			{name: "transform", method: http.MethodGet, path: "/v1/transform", wantStatus: http.StatusMethodNotAllowed},
 			{name: "anonymize", method: http.MethodGet, path: "/v1/anonymize", wantStatus: http.StatusMethodNotAllowed},
 			{name: "receipts", method: http.MethodPost, path: "/v1/receipts/abc", wantStatus: http.StatusMethodNotAllowed},
+			{name: "receipts_list", method: http.MethodPost, path: "/v1/receipts", wantStatus: http.StatusMethodNotAllowed},
 		}
 
 		for _, tc := range tests {
@@ -939,6 +1026,9 @@ func TestEventsAdapterFilterCanonicalized(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new store: %v", err)
 	}
+	t.Cleanup(func() {
+		_ = s.Close()
+	})
 	h := New(testPolicy(), s, nil, "", 0)
 	h.SetEventReader(fakeEventReader{events: []shim.DecisionEvent{
 		{Tool: "claude", Decision: string(models.DecisionAllow)},

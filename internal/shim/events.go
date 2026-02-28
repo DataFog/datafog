@@ -3,7 +3,6 @@ package shim
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -53,12 +52,133 @@ type noopEventSink struct{}
 func (s noopEventSink) Record(_ DecisionEvent) {}
 
 type NDJSONDecisionEventSink struct {
-	path string
-	mu   sync.Mutex
+	path         string
+	writes       chan DecisionEvent
+	closed       chan struct{}
+	closeOnce    sync.Once
+	writer       *bufio.Writer
+	file         *os.File
+	flushTimeout time.Duration
+	mu           sync.RWMutex
+	isClosed     bool
+	writeMu      sync.Mutex
 }
 
 func NewNDJSONDecisionEventSink(path string) *NDJSONDecisionEventSink {
-	return &NDJSONDecisionEventSink{path: path}
+	sink := &NDJSONDecisionEventSink{
+		path:         path,
+		writes:       make(chan DecisionEvent, 512),
+		closed:       make(chan struct{}),
+		flushTimeout: 500 * time.Millisecond,
+	}
+	if path == "" {
+		return sink
+	}
+	if err := sink.openWriter(); err != nil {
+		// Will keep trying when events arrive.
+	}
+	go sink.loop()
+	return sink
+}
+
+func (s *NDJSONDecisionEventSink) Close() error {
+	if s == nil || s.path == "" {
+		return nil
+	}
+
+	s.closeOnce.Do(func() {
+		s.mu.Lock()
+		s.isClosed = true
+		s.mu.Unlock()
+
+		close(s.writes)
+		<-s.closed
+	})
+	return nil
+}
+
+func (s *NDJSONDecisionEventSink) openWriter() error {
+	if s.path == "" {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o750); err != nil {
+		return err
+	}
+
+	file, err := os.OpenFile(s.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	s.file = file
+	s.writer = bufio.NewWriter(file)
+	return nil
+}
+
+func (s *NDJSONDecisionEventSink) closeWriter() error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	if s.writer != nil {
+		if err := s.writer.Flush(); err != nil {
+			return err
+		}
+		s.writer = nil
+	}
+	if s.file != nil {
+		if err := s.file.Close(); err != nil {
+			s.file = nil
+			return err
+		}
+		s.file = nil
+	}
+	return nil
+}
+
+func (s *NDJSONDecisionEventSink) flushWriter() error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	if s.writer == nil {
+		return nil
+	}
+	if err := s.writer.Flush(); err != nil {
+		return err
+	}
+	return s.file.Sync()
+}
+
+func (s *NDJSONDecisionEventSink) loop() {
+	defer close(s.closed)
+	defer func() {
+		_ = s.closeWriter()
+	}()
+
+	ticker := time.NewTicker(s.flushTimeout)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case event, ok := <-s.writes:
+			if !ok {
+				_ = s.flushWriter()
+				return
+			}
+			s.writeMu.Lock()
+			if s.writer == nil {
+				if err := s.openWriter(); err != nil {
+					s.writeMu.Unlock()
+					continue
+				}
+			}
+			payload, err := json.Marshal(event)
+			if err != nil {
+				s.writeMu.Unlock()
+				continue
+			}
+			_, _ = s.writer.Write(append(payload, '\n'))
+			s.writeMu.Unlock()
+		case <-ticker.C:
+			_ = s.flushWriter()
+		}
+	}
 }
 
 func (s *NDJSONDecisionEventSink) Record(event DecisionEvent) {
@@ -66,25 +186,18 @@ func (s *NDJSONDecisionEventSink) Record(event DecisionEvent) {
 		return
 	}
 
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o750); err != nil {
+	s.mu.RLock()
+	closed := s.isClosed
+	s.mu.RUnlock()
+	if closed {
 		return
 	}
 
-	payload, err := json.Marshal(event)
-	if err != nil {
-		return
+	select {
+	case s.writes <- event:
+	default:
+		// Drop events when the buffer is full.
 	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	file, err := os.OpenFile(s.path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-	if err != nil {
-		return
-	}
-	defer file.Close()
-
-	_, _ = fmt.Fprintln(file, string(payload))
 }
 
 // Query reads events from the NDJSON file and applies filters.
@@ -93,8 +206,8 @@ func (s *NDJSONDecisionEventSink) Query(q EventQuery) ([]DecisionEvent, error) {
 		return nil, nil
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	f, err := os.Open(s.path)
 	if err != nil {
@@ -137,6 +250,9 @@ func (s *NDJSONDecisionEventSink) Query(q EventQuery) ([]DecisionEvent, error) {
 			break
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
 
-	return events, scanner.Err()
+	return events, nil
 }

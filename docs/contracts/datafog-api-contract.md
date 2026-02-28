@@ -337,6 +337,36 @@ Returns persisted decision receipts.
 }
 ```
 
+### `GET /v1/receipts`
+
+Returns a bounded list of recent receipts.
+
+Query params:
+
+- `limit` (`1..1000`, default `100`)
+- `after` (RFC3339 timestamp, strictly greater-than)
+- `before` (RFC3339 timestamp, strictly less-than)
+- `decision` (`allow|allow_with_redaction|transform|deny`)
+- `action_type` (match against `action.type`)
+
+Results are sorted newest-first by `timestamp`.
+
+```json
+{
+  "receipts": [
+    {
+      "receipt_id": "string",
+      "timestamp": "RFC3339 timestamp",
+      "decision": "allow|allow_with_redaction|transform|deny",
+      "action": {
+        "type": "string"
+      }
+    }
+  ],
+  "total": 1
+}
+```
+
 ### `GET /v1/events`
 
 Returns decision events when `DATAFOG_EVENTS_PATH` is configured (or another reader is set).
@@ -376,6 +406,19 @@ Query params:
 ```
 
 If no events are configured or none match, return `{"events":[],"total":0}`.
+
+## Optional admin dashboard (v1)
+
+The following route is available when `DATAFOG_ENABLE_ADMIN_UI` or `--enable-admin-ui` is set:
+
+- `GET /admin`
+
+It serves a read-only static dashboard for operations and diagnostics. If enabled, a lightweight HTML asset is served from:
+
+- `docs/admin.html` by default,
+- or the path specified by `DATAFOG_ADMIN_HTML`.
+
+Supported auth follows normal API middleware behavior; requesters may use the same token and request ID model as all other routes.
 
 ## Idempotency
 

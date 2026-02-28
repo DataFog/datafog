@@ -1,8 +1,13 @@
 package scan
 
 import (
+	"context"
+	"runtime"
 	"strings"
+	"sync"
 	"unicode"
+
+	"golang.org/x/sync/semaphore"
 
 	"github.com/datafog/datafog-api/internal/models"
 )
@@ -116,8 +121,66 @@ var wellKnownLocations = map[string]bool{
 	"japan": true, "china": true, "india": true, "brazil": true,
 }
 
-// NEREnabled controls whether the NER engine runs. Can be toggled via env var.
+// NEREnabled controls whether the heuristic NER engine runs.
+// It can be toggled via env var by caller-level config.
 var NEREnabled = true
+
+var (
+	nerOnce      sync.Once
+	nerLimiterMu sync.Mutex
+	nerLimiter   *semaphore.Weighted
+)
+
+func ensureNERState() {
+	nerOnce.Do(func() {
+		personTriggers = normalizeTokenMap(personTriggers)
+		orgSuffixes = normalizeTokenMap(orgSuffixes)
+		locationTriggers = normalizeTokenMap(locationTriggers)
+		wellKnownLocations = normalizeTokenMap(wellKnownLocations)
+		commonFirstNames = normalizeTokenMap(commonFirstNames)
+
+		workers := runtime.GOMAXPROCS(0)
+		if workers < 1 {
+			workers = 1
+		}
+		numWorkers := int64(workers)
+		nerLimiterMu.Lock()
+		nerLimiter = semaphore.NewWeighted(numWorkers)
+		nerLimiterMu.Unlock()
+	})
+}
+
+func normalizeTokenMap(src map[string]bool) map[string]bool {
+	normalized := make(map[string]bool, len(src))
+	for token := range src {
+		normalized[strings.ToLower(strings.TrimSpace(token))] = true
+	}
+	return normalized
+}
+
+func acquireNERSlot() error {
+	ensureNERState()
+	nerLimiterMu.Lock()
+	lim := nerLimiter
+	nerLimiterMu.Unlock()
+	if lim == nil {
+		return nil
+	}
+	return lim.Acquire(context.Background(), 1)
+}
+
+func releaseNERSlot() {
+	nerLimiterMu.Lock()
+	lim := nerLimiter
+	nerLimiterMu.Unlock()
+	if lim != nil {
+		lim.Release(1)
+	}
+}
+
+// NEREnabled controls whether the NER engine runs. Can be toggled via env var.
+// Kept for backward compatibility with existing tests and integrations.
+// var NEREnabled = true
 
 // ScanNER runs the heuristic NER engine over text and returns findings
 // for person, organization, and location entities.
@@ -127,6 +190,9 @@ func ScanNER(text string, entityFilter []string) []models.ScanFinding {
 	}
 
 	requested := requestedEntitySet(entityFilter)
+	if len(requested) > 0 && !shouldRunNERForFilter(requested) {
+		return nil
+	}
 	return scanNERWithFilter(text, requested)
 }
 
@@ -134,8 +200,13 @@ func scanNERWithFilter(text string, requested map[string]struct{}) []models.Scan
 	if !NEREnabled {
 		return nil
 	}
+	ensureNERState()
+	if err := acquireNERSlot(); err != nil {
+		return nil
+	}
+	defer releaseNERSlot()
 
-	if len(requested) > 0 && !shouldRunNERForFilter(requested) {
+	if !hasRequestedNERFilter(requested) {
 		return nil
 	}
 
@@ -197,6 +268,10 @@ func scanNERWithFilter(text string, requested map[string]struct{}) []models.Scan
 				if !commonFirstNames[firstLower] && !orgSuffixes[firstLower] {
 					orgSpan = span[1:]
 				}
+			}
+			if len(orgSpan) == 0 {
+				i += len(span) - 1
+				continue
 			}
 			orgText := buildSpanText(text, orgSpan)
 			findings = append(findings, models.ScanFinding{
@@ -266,6 +341,22 @@ func scanNERWithFilter(text string, requested map[string]struct{}) []models.Scan
 	}
 
 	return findings
+}
+
+func hasRequestedNERFilter(requested map[string]struct{}) bool {
+	if len(requested) == 0 {
+		return true
+	}
+	if _, ok := requested["person"]; ok {
+		return true
+	}
+	if _, ok := requested["organization"]; ok {
+		return true
+	}
+	if _, ok := requested["location"]; ok {
+		return true
+	}
+	return false
 }
 
 type tokenInfo struct {
