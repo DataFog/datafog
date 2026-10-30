@@ -1,8 +1,8 @@
-# DataFog
+# datafog
 
 **The data firewall for agents and developer tools.**
 
-DataFog is a runtime **data governance layer** for AI agents and developer tooling.
+datafog is a runtime **data governance layer** for AI agents and developer tooling.
 
 It runs a single in-process policy loop: **detect → decide → enforce**.
 For each payload crossing a process boundary (command execution, file read/write, or API action),
@@ -15,7 +15,7 @@ This repo has two runtime pieces:
 
 The wrapper process is still named `datafog-shim` for compatibility, but we describe its role as a *policy gate*.
 
-## What DataFog does (technical)
+## What datafog does (technical)
 
 1. **Detect** sensitive entities in text and payload context (`/v1/scan`).
 2. **Decide** using adapter-aware policy rules (`/v1/decide`) from `policy.json`.
@@ -40,9 +40,9 @@ The wrapper process is still named `datafog-shim` for compatibility, but we desc
 
 ## Positioning
 
-- **Developers and agent builders:** DataFog is a **data-aware policy enforcement layer** for CLI tools and AI agents. It sits in your PATH or runtime, inspects data flowing through commands, and enforces policy before sensitive actions execute.
-- **Security/compliance buyers:** DataFog maps closely to runtime DLP for developer workstations, but without the legacy footprint: policy is programmable (OPA-style), decision-aware, and process-bound.
-- **Broader view:** DataFog is the **data plane for agent governance** — detect, decide, enforce, and audit.
+- **Developers and agent builders:** datafog is a **data-aware policy enforcement layer** for CLI tools and AI agents. It sits in your PATH or runtime, inspects data flowing through commands, and enforces policy before sensitive actions execute.
+- **Security/compliance buyers:** datafog maps closely to runtime DLP for developer workstations, but without the legacy footprint: policy is programmable (OPA-style), decision-aware, and process-bound.
+- **Broader view:** datafog is the **data plane for agent governance** — detect, decide, enforce, and audit.
 
 ## Repository layout
 
@@ -207,7 +207,7 @@ curl 'http://localhost:8080/v1/events?limit=20&decision=deny'
 ## Enforcement policy gate (`datafog-shim`)
 
 `datafog-shim` is an optional runtime layer for CLI-style workflows.
-It sends action details to DataFog (`/v1/decide`) before executing shell/file actions.
+It sends action details to datafog (`/v1/decide`) before executing shell/file actions.
 
 Build it:
 
